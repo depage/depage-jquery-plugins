@@ -1,5 +1,5 @@
 /**
- * @require framework/shared/jquery-1.8.3.js
+ * @require framework/shared/jquery-1.12.3.min.js
  *
  * @file    depage-uploader.js
  *
@@ -63,6 +63,9 @@
         // Cache the XHR object
         base.xhrHttpRequest = new XMLHttpRequest();
 
+        // save dropped files
+        base.droppedFiles = [];
+
         // {{{ init
         /**
          * Init
@@ -74,8 +77,14 @@
          * @return void
          */
         base.init = function(){
-
             base.options = $.extend({}, $.depage.uploader.defaultOptions, options);
+
+            if (base.options.src === "") {
+                base.options.src = base.$form.attr('action');
+            }
+            if (base.options.src === "") {
+                base.options.src = document.location.href;
+            }
 
             if ( base.support() === 'iframe') {
                 // make iframe id unique // TODO enforce
@@ -116,6 +125,9 @@
             // default drag and drop for input
             if (base.options.$drop_area === null) {
                 base.options.$drop_area = base.$el;
+            }
+
+            if (base.mode == "xhr") {
                 base.dropAndDrop();
             }
         };
@@ -243,6 +255,7 @@
                 // check browser drag and drop support
                 var div = document.createElement('div'); // TODO could move this to support() function
                 if (('draggable' in div) || ('ondragstart' in div && 'ondrop' in div && !!window.FileReader)) {
+                    base.options.$drop_area.addClass("has-drop-support");
 
                     // TODO deprecate on jquery upgrade
                     // fix for jquery 1.7 bug http://bugs.jquery.com/ticket/10756
@@ -250,8 +263,7 @@
 
                     $(document)
                         .on('dragover', function () {
-                            base.options.$drop_area.addClass('drag-over');
-                            return false;
+                            base.options.$drop_area.addClass('drag-over'); return false;
                         })
                         .on('dragend', function () {
                             base.options.$drop_area.removeClass('drag-over');
@@ -262,6 +274,8 @@
                                 base.options.$drop_area.removeClass('drag-over');
                                 // append the dropped files to the input element (triggers upload via change event)
                                 base.$el.prop("files", e.dataTransfer.files);
+                                base.droppedFiles = e.dataTransfer.files;
+                                base.upload();
                             }
                             return false;
                         });
@@ -519,7 +533,6 @@
                     // TODO x-browser test and fallback
                     if (e.lengthComputable) {
                         base.setProgress( e.loaded * 100 / e.total, e.loaded, e.total);
-                        // base.setProgress( e.position * 100 / e.totalSize );
                     }
                 };
                 base.xhrHttpRequest.onload = function(e) {
@@ -533,16 +546,27 @@
                 base.start();
 
                 var formData = new FormData();
-                formData.append('formName', $('input[name="formName"]', base.$form).val());
-                formData.append('formAutosave', 'true');
-                formData.append('ajax', 'true');
+                var hasFiles = false;
 
                 // append the files
-                for(var i = 0; i < base.el.files.length; i++) {
+                for (var i = 0; i < base.el.files.length; i++) {
                     formData.append(base.el.name, base.el.files[i]);
+                    hasFiles = true;
                 }
+                for (var j = 0; j < base.droppedFiles.length; j++) {
+                    formData.append(base.el.name, base.droppedFiles[j]);
+                    hasFiles = true;
+                }
+                base.droppedFiles = [];
 
-                base.xhrHttpRequest.send(formData);
+                if (hasFiles) {
+                    formData.append('formName', $('input[name="formName"]', base.$form).val());
+                    formData.append('formCsrfToken', $('input[name="formCsrfToken"]', base.$form).val());
+                    formData.append('formAutosave', 'true');
+                    formData.append('ajax', 'true');
+
+                    base.xhrHttpRequest.send(formData);
+                }
             }
             // }}}
         };
@@ -586,6 +610,8 @@
             }
             base.clear();
             base.$el.trigger('error', message);
+
+            base.setTextinfo("upload error");
         };
         // }}}
 
@@ -605,6 +631,8 @@
             });
             base.$el.attr('disabled', true);
             base.controls.progress.show();
+            base.setProgress(0);
+            base.setTextinfo("upload starting");
             base.$el.trigger('start');
         };
         // }}}
@@ -625,6 +653,8 @@
             base.$el.trigger(base.options.complete_event, [response]);
             base.setProgress(100);
             base.clear();
+
+            base.setTextinfo("upload finished");
         };
         // }}}
 
@@ -677,17 +707,17 @@
         base.setProgress = function(percent, loaded, total){
             var text = "";
 
-            base.controls.percent.width(percent + '%');
+            base.controls.progress.prop("value", percent.toFixed(0));
 
             if (loaded !== undefined && total !== undefined) {
-                text += Math.floor(percent * 10) / 10;
+                text += percent.toFixed(1);
                 text += " % uploaded (";
                 text += base.bytesToSize(loaded, 1);
                 text += "/";
                 text += base.bytesToSize(total, 1);
                 text += ")";
             }
-            base.controls.textinfo.text(text);
+            base.setTextinfo(text);
         };
         // }}}
 
@@ -708,7 +738,7 @@
             var terabyte = gigabyte * 1024;
 
             if ((bytes >= 0) && (bytes < kilobyte)) {
-                return bytes + ' B';
+                return bytes + ' B ';
             } else if ((bytes >= kilobyte) && (bytes < megabyte)) {
                 return (bytes / kilobyte).toFixed(precision) + ' KB';
             } else if ((bytes >= megabyte) && (bytes < gigabyte)) {
@@ -718,7 +748,7 @@
             } else if (bytes >= terabyte) {
                 return (bytes / terabyte).toFixed(precision) + ' TB';
             } else {
-                return bytes + ' B';
+                return bytes + ' B ';
             }
         };
         // }}}
@@ -737,7 +767,6 @@
         base.fallback = function(){
             var $img = $('<img />')
                 .attr({
-                    'id' : base.options.iframe + '-loader',
                     'src' : base.options.loader_img,
                     'alt' : "uploading"
                 }).error(function(){
@@ -758,30 +787,38 @@
          */
         base.addProgress = function() {
             base.controls = {
-                progress : $('<span />').attr({
-                    'id': base.el.id + '-progress',
+                progress : $('<progress max="100" value="0" />').attr({
                     //'style' : 'display:none;'
                     'class' : base.options.classes.progress
                 }),
                 percent : $('<span />').attr({
-                    'id': base.el.id + '-percent',
                     'class' : base.options.classes.percent
                 }).width('0%'),
                 textinfo : $('<span />').attr({
-                    'id': base.el.id + '-textinfo',
                     'class' : base.options.classes.textinfo
                 })
             };
 
-            base.$el.after(base.controls.textinfo);
+            //base.controls.progress.append(base.controls.percent);
 
-            base.controls.progress.append(base.controls.percent);
-
-            if(base.options.$progress_container) {
+            if (base.options.$progress_container) {
                 base.options.$progress_container.append(base.controls.progress);
+                base.options.$progress_container.append(base.controls.textinfo);
             } else {
                 base.$el.after(base.controls.progress);
+                base.$el.after(base.controls.textinfo);
             }
+        };
+        // }}}
+
+        // {{{ setTextinfo()
+        /**
+         * setTextinfo
+         *
+         * @return
+         */
+        base.setTextinfo = function(text) {
+            base.controls.textinfo.text(text);
         };
         // }}}
 
@@ -812,7 +849,7 @@
             percent:  'percent',
             textinfo: 'textinfo'
         },
-        src: document.location.href,
+        src: "",
         iframe: 'upload_target',
         server_src : 'framework/media/uploadprogress.php',
         server_upload_key : 'APC_UPLOAD_PROGRESS',
