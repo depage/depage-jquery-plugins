@@ -110,7 +110,7 @@
 
             // bind cancel button if provided
             if (base.options.cancel_button) {
-                base.$cancel_button = $('<a class="cancel-video-button" href="#cancel-video">&times;</a>').insertBefore(base.$el);
+                base.$cancel_button = $('<a class="cancel-button" href="#cancel">&times;</a>').insertBefore(base.$el);
                 base.$cancel_button.click(function() {
                     base.cancel();
                     return false;
@@ -128,7 +128,7 @@
             }
 
             if (base.mode == "xhr") {
-                base.dropAndDrop();
+                base.dragAndDrop();
             }
         };
         // }}}
@@ -163,12 +163,12 @@
             // }}}
 
             // {{{ setupCustomButton
-        /**
-         * setupCustomButton
-         *
-         * Based on http://goo.gl/uu5k6
-         *
-         */
+            /**
+             * setupCustomButton
+             *
+             * Based on http://goo.gl/uu5k6
+             *
+             */
             base.setupCustomButton = function (){
 
                 base.$el.wrap('<div class="custom-file-input-wrapper" style="position: relative;"/>');
@@ -245,13 +245,13 @@
             },
             // }}}
 
-            // {{{
-        /**
-         * Setup drag and drop
-         *
-         * Implements HTML5 drag'n'drop file uploads by monitoring browser drag events
-         */
-            base.dropAndDrop = function() {
+            // {{{ dragAndDrop
+            /**
+            * Setup drag and drop
+            *
+            * Implements HTML5 drag'n'drop file uploads by monitoring browser drag events
+            */
+            base.dragAndDrop = function() {
                 // check browser drag and drop support
                 var div = document.createElement('div'); // TODO could move this to support() function
                 if (('draggable' in div) || ('ondragstart' in div && 'ondrop' in div && !!window.FileReader)) {
@@ -671,24 +671,11 @@
          * @return void
          */
         base.clear = function () {
-
-            // clone, reset, detach to clear the element
-            var $clone = base.$el.clone(true);
-            $('<form></form>').append($clone)[0].reset();
-            base.$el.after($clone).detach();
-
-            base.$el.replaceWith($clone);
-
-            base.$el = $clone;
-            base.el = $clone[0];
-
-            // rebind change
-            base.$el.change(function() {
-                base.upload();
-            });
+            base.$el.wrap('<form>').closest('form').get(0).reset();
+            base.$el.unwrap();
 
             base.setProgress(0);
-            //base.controls.progress.hide();
+
             base.$el.removeAttr('disabled');
             $(window).unbind('unload.uploader');
         };
