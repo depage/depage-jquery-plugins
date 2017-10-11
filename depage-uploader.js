@@ -633,6 +633,7 @@
             base.controls.progress.show();
             base.setProgress(0);
             base.setTextinfo("upload starting");
+            base.options.$drop_area.addClass("uploading");
             base.$el.trigger('start');
         };
         // }}}
@@ -651,6 +652,7 @@
             }
 
             base.$el.trigger(base.options.complete_event, [response]);
+            base.options.$drop_area.removeClass("uploading");
             base.setProgress(100);
             base.clear();
 
