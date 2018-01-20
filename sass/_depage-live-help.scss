@@ -1,3 +1,6 @@
+$depageLiveHelpColor: #047cbf !default;
+$depageLiveHelpTextColor: #ffffff !default;
+
 #depage-live-help {
     position: absolute;
     top: 0;
@@ -23,15 +26,15 @@
         z-index: 1;
 
         line {
-            stroke: #047cbf;
+            stroke: $depageLiveHelpColor;
             stroke-width: 2px;
         }
     }
     div {
         position: absolute;
         padding: 0.5em;
-        background: #047cbf;
-        color: #ffffff;
+        background: $depageLiveHelpColor;
+        color: $depageLiveHelpTextColor;
         @include radius(0.5em);
         max-width: 12em;
         z-index: 2;
