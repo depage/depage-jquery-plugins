@@ -1,11 +1,7 @@
 /**
- * @require framework/shared/jquery-1.4.2.js
- * @require framework/shared/depage-jquery-plugins/depage-flash.js
- * @require framework/shared/depage-jquery-plugins/depage-browser.js
- *
  * @file depage-audio.js
  *
- * Adds a custom audio player, using either HTML5 audio if available, TODO - or falling back to flash if not.
+ * Adds a custom audio player, using HTML5 audio element
  *
  * copyright (c) 2006-2012 Frank Hellenkamp [jonas@depage.net]
  *
@@ -15,22 +11,6 @@
     if(!$.depage){
         $.depage = {};
     }
-
-    // shiv {{{
-    /**
-     * Shiv Audio
-     *
-     * Adds audio element to the DOM to enable recognition in IE < 9.
-     *
-     * @return void
-     */
-    if ($.browser.msie && $.browser.version < 9) {
-        $('head').append('<style>audio{display:inline-block;*display:inline;*zoom:1}</style>');
-        document.createElement("audio");
-        document.createElement("source");
-    }
-    // }}}
-
 
     /**
      * Depage Audio
@@ -55,7 +35,8 @@
         base.$el.data("depage.audio", base);
 
         // cache selectors
-        var audio = $('audio', base.$el)[0];
+        var $audio = $('audio', base.$el);
+        var audio = $audio[0];
 
         // set the player mode - 'html5' / 'flash' / false (fallback)
         var mode = false;
@@ -75,7 +56,13 @@
         base.init = function(){
             base.options = $.extend({}, $.depage.audio.defaultOptions, options);
 
-            $.depage.audio.instances[base.options.playerId] = base;
+            var id = base.options.playerId;
+
+            if (base.el.id) {
+                id = base.el.id;
+            }
+
+            $.depage.audio.instances.push(base);
         };
         // }}}
 
@@ -98,6 +85,7 @@
                 support.ogg = audio.canPlayType('audio/ogg;').replace(/^no$/,'');
                 support.mpeg = audio.canPlayType('audio/mpeg;').replace(/^no$/,'');
                 support.mp3 = audio.canPlayType('audio/mp3;').replace(/^no$/,'');
+                support.mp4 = audio.canPlayType('audio/mp4;').replace(/^no$/,'');
             } catch(e) { }
             finally{
                 // TODO flash support
@@ -125,24 +113,21 @@
             // support = { 'flash' : true };
 
             // determine the supported player mode - flash or html5
-            if ( support.mp3 && $('source:[type="audio/mp3"]', audio).length > 0
-                || support.ogg && $('source:[type="audio/ogg"]', audio).length > 0
-                || support.wav && $('source:[type="audio/wav"]', audio).length > 0
-                || support.mpeg && $('source:[type="audio/mpeg"]', audio).length > 0) {
+            if ( support.mp3 && $('source[type="audio/mp3"]', audio).length > 0 ||
+                support.ogg && $('source[type="audio/ogg"]', audio).length > 0 || 
+                support.wav && $('source[type="audio/wav"]', audio).length > 0 ||
+                support.mp4 && $('source[type="audio/mp4"]', audio).length > 0 ||
+                support.mpeg && $('source[type="audio/mpeg"]', audio).length > 0) {
                 mode = 'html5';
                 base.player = audio;
                 base.html5.setup();
-            } else if (support.flash) {
-                 mode = 'flash';
-
-                 // TODO FLASH PLAYER
             } else {
                 // fallback
                 return false;
             }
 
             var div = $("<div class=\"controls\"></div>");
-            if (useCustomControls) {
+            if (base.options.useCustomControls) {
                 base.addControls(div);
             } else {
                 $audio.attr("controls", "true");
@@ -166,19 +151,20 @@
                 // attribute fixes issue with IE9 poster not displaying - add in html
                 // $audio.attr('preload', 'none');
 
-                $audio.bind("play", function(){
-                    base.play();
+                $audio.on("play", function(){
+                    base.onPlay();
                 });
 
-                $audio.bind("pause", function(){
-                    base.pause();
+                $audio.on("pause", function(){
+                    base.onPause();
                 });
 
-                $audio.bind("timeupdate", function(){
+                $audio.on("timeupdate", function(){
                     base.setCurrentTime(this.currentTime);
+                    base.duration(audio.duration);
                 });
 
-                $audio.bind("ended", function(){
+                $audio.on("ended", function(){
                     base.end();
                 });
 
@@ -189,16 +175,16 @@
                  *
                  * @return false
                  */
-                $audio.bind("progress", function(){
+                $audio.on("progress", function(){
                     var defer = null;
                     var progress = function(){
                         var loaded = 0;
-                        if (audio.buffered && audio.buffered.length > 0 && audio.buffered.end && audio.duration) {
+                        if (audio.buffered && audio.buffered.length > 0 && audio.buffered.end && typeof audio.duration != 'undefined') {
                             loaded = audio.buffered.end(audio.buffered.length-1) / audio.duration;
                         }
                         // for browsers not supporting buffered.end (e.g., FF3.6 and Safari 5)
-                        else if (typeof(audio.bytesTotal) !== 'undefined' && audio.bytesTotal > 0
-                                && typeof(audio.bufferedBytes) !== 'undefined') {
+                        else if (typeof(audio.bytesTotal) !== 'undefined' && audio.bytesTotal > 0 &&
+                                 typeof(audio.bufferedBytes) !== 'undefined') {
                             loaded = audio.bufferedBytes / audio.bytesTotal;
                         }
 
@@ -225,7 +211,7 @@
                  *
                  * @return false
                  */
-                $audio.bind("loadeddata", function(){
+                $audio.on("loadeddata", function(){
                     base.percentLoaded(1);
                 });
 
@@ -238,7 +224,7 @@
                  *
                  * @return void
                  */
-                $audio.bind("waiting", function(){
+                $audio.on("waiting", function(){
                     base.html5.$buffer_image.show();
                 });
 
@@ -251,7 +237,7 @@
                  *
                  * @return void
                  */
-                $audio.bind("playing", function(){
+                $audio.on("playing", function(){
                     base.html5.$buffer_image.hide();
                 });
 
@@ -269,123 +255,12 @@
                     if (offset <= 0) {
                         offset = 0.1;
                     }
-                    if (offset > duration) {
-                        offset = duration;
+                    if (offset > audio.duration) {
+                        offset = audio.duration;
                     }
                     base.player.currentTime = offset;
                     return false;
                 };
-            }
-            // }}}
-        };
-
-        /**
-         * Namespace Flash Functions
-         */
-        base.flash = {
-            // flash.transport() {{{
-            /**
-             * Flash Transport
-             *
-             * Adds transport actions to the flash player.
-             *
-             * Uses set interval to wait for flash initialization.
-             *
-             * @return void
-             */
-            transport : function() {
-                /* TODO implement flash player
-
-                var actions = [ "load", "play", "pause", "seek" ];
-
-                // {{{ serialize()
-                /**
-                 * serialize
-                 *
-                 * Serializes the arguments passed to the flash player object
-                 *
-                 * @param string action - control action called
-                 * @param array args - flash player arguments
-                 *
-                 * @return string code
-                 *
-                var serialize = function ( action, args ){
-
-                    $.each(args, function(i, arg){
-                        args[i] = '"' + String(arg).replace('"', '\"') + '"';
-                    });
-
-                    return action + "(" + args.join(',') + ");";
-                };
-                // }}}
-
-                $.each ( actions, function (i, action) {
-
-                    base.player[action] = function() {
-
-                        if (!base.player.initialized) {
-                            base.flash.insertPlayer();
-                        }
-
-                        var code = serialize(action, Array.prototype.slice.call(arguments));
-
-                        var defer = setInterval(function() {
-                            caller();
-                        }, 300);
-
-                        var caller = function() {
-                            try {
-                                if (($.browser.msie && eval("window['" + base.options.playerId + "'].f" + code))
-                                         || eval("document['" + base.options.playerId + "'].f" + code)){
-                                     clearInterval(defer);
-                                }
-                            } catch (e) { }
-                        };
-                    };
-                });
-                */
-            },
-            // }}}
-
-            // {{{ flash.insertPlayer()
-            /**
-             * Insert Flash Player
-             *
-             * Insert the flash object for the player using the depage flash plugin.
-             *
-             * Overwrites the audio container
-             *
-             * @return void
-             */
-            insertPlayer : function() {
-                /* TODO FLASH PLAYER
-
-                // get absolute url from source attribute with mp3-type
-                var $link = $("<a href=\"" + $('source:[type="audio/mp3"]', audio).attr("src") + "\"></a>").appendTo("body");
-                var url = $link[0].toString();
-                $link.remove();
-
-                var flashParams = {
-                    rand: Math.random(),
-                    id : base.options.playerId
-                };
-                if (window.console && base.options.debug) {
-                    flashParams.debug = "true";
-                }
-                var html = $.depage.flash().build({
-                    src    : base.options.assetPath + "depage_player.swf",
-                    id     : base.options.playerId,
-                    wmode  : 'transparent',
-                    params : flashParams
-                });
-
-                // use innerHTML for IE < 9 otherwise player breaks!!
-                $wrapper[0].innerHTML = html.plainhtml;
-
-                base.player.initialized = true;
-
-                base.player.load(url);
-                */
             }
             // }}}
         };
@@ -408,7 +283,6 @@
             return div;
         };
         // }}}
-
         // {{{ addControls()
         /**
          * Add Controls
@@ -418,13 +292,13 @@
          * @return void
          */
         base.addControls = function(div){
-            var imgSuffix = ($.browser.msie && $.browser.version < 7) ? ".gif" : ".png";
+            var imgSuffix = base.options.imageSuffix;
 
             $audio.removeAttr("controls");
 
             base.controls.progress = $("<span class=\"progress\" />")
                 .mouseup(function(e) {
-                    var offset = (e.pageX - $(this).offset().left) / $(this).width() * duration;
+                    var offset = (e.pageX - $(this).offset().left) / $(this).width() * audio.duration;
                     base.player.seek(offset);
                 });
             base.controls.buffer = $("<span class=\"buffer\"></span>")
@@ -432,43 +306,42 @@
 
             base.controls.position = $("<span class=\"position\"></span>")
                 .appendTo(base.controls.progress)
-                .bind('dragstart', function(e) {
+                .on('dragstart', function(e) {
                     // mouse drag
                     var $progress = $('.progress');
                     var offset = $progress.offset().left;
                     var width = $progress.width();
-                    $(this).bind('drag.seek', function(e) {
+                    $(this).on('drag.seek', function(e) {
                         // TODO not firing in firefox!
                         if (e.pageX > 0) { // TODO HACK last drag event in chrome fires pageX = 0?
-                            var position = (e.pageX - offset) / width * duration;
+                            var position = (e.pageX - offset) / width * audio.duration;
                             // console.log(position);
                             base.player.seek(position);
                         }
                     });
                 })
-                .bind('dragend', function(e) {
-                    // unbind drag
-                    $(this).unbind('drag.seek');
+                .on('dragend', function(e) {
+                    $(this).off('drag.seek');
                     return false;
-                });;
+                });
 
             base.controls.progress.appendTo(div);
 
-            base.controls.play = $("<a class=\"play\"><img src=\"" + base.options.assetPath + "play_button" + imgSuffix + "\" alt=\"play\"></a>")
+            base.controls.play = $("<a class=\"play\"><img src=\"" + base.options.assetPath + "icon-play" + imgSuffix + "\" alt=\"play\"></a>")
                 .appendTo(div)
                 .click(function() {
                     base.player.play();
                     return false;
                 });
 
-            base.controls.pause = $("<a class=\"pause\" style=\"display: none\"><img src=\"" + base.options.assetPath + "pause_button" + imgSuffix + "\" alt=\"pause\"></a>")
+            base.controls.pause = $("<a class=\"pause\" style=\"display: none\"><img src=\"" + base.options.assetPath + "icon-pause" + imgSuffix + "\" alt=\"pause\"></a>")
                 .appendTo(div)
                 .click(function() {
                     base.player.pause();
                     return false;
                 });
 
-            base.controls.rewind = $("<a class=\"rewind\"><img src=\"" + base.options.assetPath + "rewind_button" + imgSuffix + "\" alt=\"rewind\"></a>")
+            base.controls.rewind = $("<a class=\"rewind\"><img src=\"" + base.options.assetPath + "icon-rewind" + imgSuffix + "\" alt=\"rewind\"></a>")
                 .appendTo(div)
                 .click(function() {
                     base.player.seek(0.1); // setting to zero breaks iOS 3.2
@@ -477,55 +350,61 @@
 
             base.controls.time = $("<span class=\"time\" />");
 
-            base.controls.current = $("<span class=\"current\">00:00/</span>")
+            base.controls.current = $("<span class=\"current\">00:00</span>")
                 .appendTo(base.controls.time);
 
-            base.controls.duration = $("<span class=\"duration\">" + base.floatToTime(duration) + "</span>")
+            base.controls.duration = $("<span class=\"duration\"></span>")
                 .appendTo(base.controls.time);
 
             base.controls.time.appendTo(div);
 
-            if (mode != "flash") {
-                base.html5.$buffer_image = $('<img class="buffer-image" />').attr('src', base.options.assetPath + 'buffering_indicator.gif').hide();
-                base.$el.append(base.html5.$buffer_image);
-            }
+            base.html5.$buffer_image = $('<img class="buffer-image" />').attr('src', base.options.assetPath + 'buffering_indicator.gif').hide();
+            base.$el.append(base.html5.$buffer_image);
         };
         // }}}
 
-        // {{{ play()
+        // {{{ onPlay()
         /**
          * Play
          *
          * @return void
          */
-        base.play = function() {
-            if (useCustomControls){
+        base.onPlay = function() {
+            if (base.options.useCustomControls){
                 base.controls.play.hide();
                 base.controls.pause.show();
                 base.controls.rewind.show();
             }
 
-            base.options.onPlay && base.options.onPlay();
+            $.each($.depage.audio.instances, function(index, player) {
+                if (player != base) {
+                    player.pause();
+                }
+            });
+
+            if (typeof base.options.onPlay == 'function') {
+                base.options.onPlay();
+            }
         };
         // }}}
-
-        // {{{ pause()
+        // {{{ onPause()
         /**
          * Pause
          *
          * @return void
          */
-        base.pause = function() {
-            if (useCustomControls){
+        base.onPause = function() {
+            if (base.options.useCustomControls){
                 base.controls.play.show();
                 base.controls.pause.hide();
                 base.controls.rewind.show();
             }
 
-            base.options.onPause && base.options.onPause();
+            if (typeof base.options.onPause == 'function') {
+                base.options.onPause();
+            }
         };
         // }}}
-
         // {{{ end()
         /**
          * End
@@ -534,7 +413,10 @@
          */
         base.end = function() {
             base.pause();
-            base.options.onEnd && base.options.onEnd();
+
+            if (typeof base.options.onEnd == 'function') {
+                base.options.onEnd();
+            }
         };
         // }}}
 
@@ -546,7 +428,7 @@
          */
         base.setCurrentTime = function(currentTime) {
             base.controls.current.html(base.floatToTime(currentTime) + "/");
-            base.controls.position.width(Math.min(currentTime / duration * 100, 100) + "%");
+            base.controls.position.width(Math.min(currentTime / audio.duration * 100, 100) + "%");
         };
         // }}}
 
@@ -594,6 +476,28 @@
         };
         // }}}
 
+        // {{{ play()
+        /**
+         * play
+         *
+         * @return void
+         */
+        base.play = function() {
+            base.player.play();
+        };
+        // }}}
+
+        // {{{ pause()
+        /**
+         * pause
+         *
+         * @return void
+         */
+        base.pause = function() {
+            base.player.pause();
+        };
+        // }}}
+
         // Run initializer
         base.init();
 
@@ -603,52 +507,12 @@
         return base;
     };
 
-    // {{{ setPlayerVar()
-    /**
-     * Flash Set Player Var
-     *
-     * This is a callback for the flash player.
-     *
-     * @param action
-     * @param value
-     *
-     * @return void
-     */
-    $.depage.player.setPlayerVar = function(playerId, action, value) {
-        var instance = $.depage.player.instances[playerId];
-
-        instance.player[action] = value;
-
-        switch (action) {
-            case "paused" :
-                if (instance.player.paused){
-                    instance.pause();
-                } else {
-                    instance.play();
-                }
-                break;
-
-            case "currentTime" :
-                instance.setCurrentTime(instance.player.currentTime);
-                break;
-
-            case "percentLoaded" :
-                instance.percentLoaded(instance.player.percentLoaded);
-                break;
-
-            case "duration" :
-                instance.duration();
-                break;
-        }
-    };
-    // }}}
-
     /**
      * instances
      *
      * Holds all player instances by id
      */
-    $.depage.player.instances = [];
+    $.depage.audio.instances = [];
 
     var $scriptElement = $("script[src *= '/depage-player.js']");
     var basePath = "";
@@ -668,9 +532,10 @@
      * @param onEnd - pass callback function to trigger on end play event
      */
     $.depage.audio.defaultOptions = {
-        use_custom_controls: false,
         assetPath : basePath + "depage_audio/",
+        imageSuffix : ".png",
         playerId : "dpAudio",
+        useCustomControls: true,
         debug: false,
         onPlay: false,
         onPause: false,
