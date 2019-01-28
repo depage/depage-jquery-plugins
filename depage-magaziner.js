@@ -249,7 +249,7 @@
         base.registerEvents = function() {
             // {{{ horizontal scrolling between pages
             base.$el.hammer(hammerOptions).on("panleft panright", function(e) {
-                if (e.gesture.pointerType == "mouse" || pageScrolling) {
+                if (e.gesture.pointerType == "mouse" || pageScrolling || e.gesture.srcEvent.type == 'pointercancel') {
                     return;
                 }
                 $prevPage.removeClass("animated");
@@ -462,7 +462,7 @@
                         $scripts.detach();
                     }
 
-                    $data.find("a:internal").each( function() {
+                    $data.find("a[href]:internal").each( function() {
                         var $el = $(this);
                         $el.attr("href", makeAbsolute(url, $el.attr("href")));
                     });
