@@ -15,7 +15,7 @@
 (function($){
     if(!$.depage){
         $.depage = {};
-    };
+    }
 
     /**
      * shyDialogue
@@ -37,6 +37,7 @@
 
         // enable buttons in the dialogue
         var $buttonWrapper = null;
+        var $inputWrapper = null;
 
         // {{{ init
         /**
@@ -71,7 +72,7 @@
          * @return void
          */
         base.bind = function(){
-            base.bind_el.bind('click.shy', function(e) {
+            base.options.bind_el.bind('click.shy', function(e) {
                 base.showDialogue(e.pageX, e.pageY);
                 return false;
             });
@@ -91,10 +92,47 @@
          * @return void
          */
         base.showDialogue = function(x, y){
-            base.show(x, y);
-            base.showButtons();
+            setTimeout(function() {
+                base.show(x, y);
+                base.showButtons();
+
+                // bind escape key to cancel
+                $(document).on('keyup.shydialogue', function(e){
+                    var key = e.which || e.keyCode;
+                    if (key == 13) {
+                        base.$wrapper.find('a.button.default').click();
+                    } else if (key == 27) {
+                        base.hideDialogue();
+                    }
+                });
+
+                // stop propagation of hide when clicking inside the wrapper or input
+                base.$wrapper.click(function(e) {
+                    e.stopPropagation();
+                });
+
+                if (base.options.bind_el) {
+                    base.$el.click(function(e) {
+                        e.stopPropagation();
+                    });
+                }
+
+                // hide dialog when clicked outside
+                $(document).on("click.shydialogue", function() {
+                    base.hideDialogue();
+                });
+
+            }, 10);
         };
         /// }}}
+        // {{{ hideDialogue
+        base.hideDialogue = function() {
+            base.hide();
+
+            $(document).off("click.shydialogue").off('keyup.shydialogue');
+
+        };
+        // }}}
 
         // {{{ showButtons()
         /**
@@ -104,9 +142,58 @@
          */
         base.showButtons = function() {
             $buttonWrapper = $('<div class="buttons" />');
-            $wrapper.append($buttonWrapper);
+            $inputWrapper = $('<div class="inputs" />');
+            this.$wrapper.append($inputWrapper);
+            this.$wrapper.append($buttonWrapper);
+
+            base.setInputs(base.options.inputs);
             base.setButtons(base.buttons);
-            $wrapper.find('a:first').focus();
+
+            this.$wrapper.find('input, a.button.default').first().focus().select();
+        };
+        // }}}
+
+        // {{{ setInputs()
+        /**
+         * setInputs
+         *
+         * @param buttons
+         *
+         * @return void
+         */
+        base.setInputs = function(inputs) {
+            $inputWrapper.empty();
+
+            for(var i in inputs) {
+                (function() {
+                    var input = base.options.inputs[i];
+                    var placeholder = input.placeholder || "";
+                    var inputType = input.type || "text";
+                    var value = input.value || "";
+                    var className = "input";
+                    if (input.classes) {
+                        className += " " + input.classes;
+                    }
+                    var $input = $('<input class="' + className + '" />')
+                        .attr('id', base.options.id + '-i' + i)
+                        .attr('placeholder', placeholder)
+                        .attr('type', inputType)
+                        .attr('value', value)
+                        .data('depage.shyDialogue', base);
+
+                    $input
+                        .on("keyup", function(e) {
+                            if (e.which == 13) {
+                                $wrapper.find('a.button.default').click();
+                            }
+                        });
+
+                    $inputWrapper.append($input);
+                })();
+            }
+
+            // allow chaining
+            return this;
         };
         // }}}
 
@@ -133,9 +220,12 @@
                         .attr('id', base.options.id + '-' + i)
                         .text(title)
                         .data('depage.shyDialogue', base)
-                        .click(function(e){
+                        .on("click", function(e){
+                            if (!$btn.hasClass("enabled")) {
+                                return false;
+                            }
                             if (typeof(button.click) !== 'function' || button.click(e) !== false) {
-                                base.hide();
+                                base.hideDialogue();
                             }
                             return false;
                         });
@@ -143,6 +233,12 @@
                     $buttonWrapper.append($btn);
                 })();
             }
+
+            setTimeout(function() {
+                $buttonWrapper
+                    .children("a.button").addClass("enabled")
+                    .filter(".default").focus();
+            }, base.options.actionActiveTimeout);
 
             // allow chaining
             return this;
@@ -170,9 +266,11 @@
         icon: '',
         title: '',
         message: '',
-        direction : 'TL',
-        directionMarker : null,
+        direction: 'TR',
+        directionMarker: null,
+        actionActiveTimeout: 10,
         fadeoutDuration: 300,
+        inputs: {},
         buttons: {},
         bind_el: null
     };
