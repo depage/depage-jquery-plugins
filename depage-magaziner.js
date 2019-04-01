@@ -16,20 +16,26 @@
     /*jslint browser: true*/
     /*global $:false History:false reinvigorate:false */
 
+    // @todo update magaziner not to add all pages but only keep three current pages and add on request
+
     if(!$.depage){
         $.depage = {};
     }
 
-    var rootUrl = History.getRootUrl();
+    var baseUrl = $("head base").attr("href") || false;
+    if (baseUrl.charAt(baseUrl.length - 1) != "/") {
+        baseUrl += "/";
+    }
+    var rootUrl = baseUrl || window.location.href;
+    var History = window.history;
 
-    // {{{ jquery.internal expression helper
-    $.expr[':'].internal = function(obj, index, meta, stack){
-        var url = $(obj).attr('href') || $(obj).attr('src') || '';
+    // holds page-numbers by urls
+    var pagesByUrl = [];
+    var urlsByPages = [];
+    var pageScrolling = false;
+    var pageScrollingTimeout;
+    var pageHtml = "<div class=\"page\"></div>";
 
-        // Check link
-        return url.substring(0, rootUrl.length) === rootUrl || url.indexOf(':') === -1;
-    };
-    // }}}
     // {{{ HTML Helper
     var documentHtml = function(html){
         // Prepare
@@ -43,56 +49,41 @@
         return result;
     };
     // }}}
-    // {{{ jquery.ajaxify Helper
-    $.fn.ajaxify = function() {
-        var $this = $(this);
-
-        // Ajaxify
-        $this.find('a:internal:not(.no-ajaxy)').each(function(){
-            // Prepare
-            var
-                $this = $(this),
-                url = this.href,
-                title = $this.attr('title') || null;
-
-            // make links absolute;
-            $this.attr("href", url);
-
-            $this.click(function(e) {
-                // Continue as normal for cmd clicks etc
-                if ( e.which == 2 || e.metaKey ) { return true; }
-
-                // Ajaxify this link
-                History.pushState(null,title,url);
-                e.preventDefault();
-                return false;
-            });
-        });
-
-        // Chain
-        return $this;
-    };
-    // }}}
     // {{{ makeAbsolute
     function makeAbsolute(base, relative) {
-        var stack = base.split("/"),
-            parts = relative.split("/");
-        stack.pop(); // remove current file name (or empty string)
-                    // (omit if "base" is the current folder without trailing slash)
-        for (var i=0; i<parts.length; i++) {
-            if (parts[i] == ".")
-                continue;
-            if (parts[i] == "..")
-                stack.pop();
-            else
-                stack.push(parts[i]);
+        if (baseUrl) {
+            return baseUrl + relative;
+        } else {
+            var stack = base.split("/"),
+                parts = relative.split("/");
+            stack.pop(); // remove current file name (or empty string)
+                        // (omit if "base" is the current folder without trailing slash)
+            for (var i=0; i<parts.length; i++) {
+                if (parts[i] == ".")
+                    continue;
+                if (parts[i] == "..")
+                    stack.pop();
+                else
+                    stack.push(parts[i]);
+            }
+            return stack.join("/");
         }
-        return stack.join("/");
     }
+    // }}}
+    // {{{ hasTouch
+    var hasTouch = (function() {
+        return 'ontouchstart' in window ||  // works on most browsers
+            navigator.maxTouchPoints;       // works on IE10/11 and Surface
+    })();
+    // }}}
+    // {{{ hasCssVariables
+    var hasCssVariables = (function() {
+        return window.CSS && window.CSS.supports && window.CSS.supports('--fake-var', 0);
+    })();
     // }}}
 
     $.depage.magaziner = function(el, pagelinkSelector, options){
-        if (!History.enabled) {
+        if (typeof History == 'undefined') {
             return;
         }
 
@@ -112,157 +103,186 @@
         var $window = $(window);
         var $document = $(document);
 
-        // holds page-numbers by urls
-        var pagesByUrl = [];
-        var urlsByPages = [];
-
-        //list of currently loaded pages
-        var $pages = base.$el.children(".page");
+        var capabilities = "";
+        if (hasTouch) {
+            capabilities += " has-touch";
+        } else {
+            capabilities += " no-touch";
+        }
+        if (hasCssVariables) {
+            capabilities += " has-css-variables";
+        }
+        $("html").addClass(capabilities);
 
         // width of one page
         var pageWidth = base.$el.width();
 
         // speed for animations
-        var speed = 300;
+        var speed = 500;
 
         // global hammer options to drag only in one direction
+        delete Hammer.defaults.cssProps.userSelect;
         var hammerOptions = {
-            drag_lock_to_axis: true
+            threshold: 20,
+            direction: Hammer.DIRECTION_VERTICAL
         };
         var scrollTop;
 
         // get the currently loaded page
         base.currentPage = -1;
         var $currentPage = null;
+        var $prevPage = null;
+        var $nextPage = null;
+        // }}}
+
+        // {{{ jquery.internal expression helper
+        $.expr[':'].internal = function(obj, index, meta, stack){
+            var url = $(obj).attr('href') || $(obj).attr('src') || '';
+
+            if (url.substr(-4) == ".pdf") return false;
+
+            // Check link
+            return url.substring(0, rootUrl.length) === rootUrl || url.indexOf(':') === -1;
+        };
+        // }}}
+        // {{{ jquery.ajaxify Helper
+        $.fn.ajaxify = function() {
+            var $this = $(this);
+
+            // Ajaxify
+            $this.find('a:internal:not(.no-ajaxy)').each(function(){
+                // Prepare
+                var
+                    $a = $(this),
+                    url = this.href,
+                    urlPath,
+                    title = $a.attr('title') || null,
+                    hash;
+
+                if (typeof $a.attr('href') == 'undefined') return;
+
+                // make links absolute;
+                $a.attr("href", url);
+
+                urlPath = url.replace(/#.*/, '');
+                hash = this.hash;
+
+                $a.on("click", function(e) {
+                    // Continue as normal for cmd clicks etc
+                    if ( e.which == 2 || e.metaKey ) { return true; }
+
+                    if (typeof pagesByUrl[urlPath] !== 'undefined') {
+                        base.show(pagesByUrl[urlPath], true, hash);
+                        return e.preventDefault();
+                    } else {
+                        base.load(url);
+                        return e.preventDefault();
+                    }
+                });
+            });
+
+            // Chain
+            return $this;
+        };
         // }}}
 
         // {{{ init()
         base.init = function() {
             base.options = $.extend({},$.depage.magaziner.defaultOptions, options);
 
+            $currentPage = $(".page").addClass("current-page");
+            base.initPageLinks();
+
+            base.registerEvents();
+            $body.ajaxify();
+
+            var beforeHtml = "";
+            var afterHtml = "";
+
+            $currentPage
+                .data("loaded", true)
+                .data("loading", false)
+                .data("classes", $body.attr("class"))
+                .data("title", document.title);
+
+            $prevPage = base.getNewPage();
+            $nextPage = base.getNewPage();
+
+            base.$el.trigger("depage.magaziner.initialized");
+
+            base.show(base.currentPage);
+
+            base.preloadPageByNumber(base.currentPage - 1);
+            base.preloadPageByNumber(base.currentPage + 1);
+        };
+        // }}}
+        // {{{ initPageLinks
+        base.initPageLinks = function() {
             var $pagelinks = $(pagelinkSelector);
-            for (var i = 0; i < $pagelinks.length; i++) {
+            pagesByUrl = [];
+            urlsByPages = [];
+
+            for (var i = 0, n = 0; i < $pagelinks.length; i++) {
                 var url = $pagelinks[i].href;
                 if ($pagelinks.eq(i).attr("href") === "") {
                     // normalize empty links that go to current page for IE
                     url = document.location.href;
                 }
-                pagesByUrl[url] = i;
-                urlsByPages[i] = url;
-            }
 
-            base.registerEvents();
-            $body.ajaxify();
+                url = url.replace(/#.*/, '');
 
-            var currentPage = pagesByUrl[document.location.href];
-            $currentPage = $(".page").addClass("current-page");
-            var beforeHtml = "";
-            var afterHtml = "";
-
-            $currentPage.data("loaded", true);
-            $currentPage.data("title", document.title);
-
-            // add empty page containers
-            for (i = 0; i < $pagelinks.length; i++) {
-                if (i < currentPage) {
-                    beforeHtml += "<div class=\"page\" style=\"display: none\"></div>";
-                } else if (i > currentPage) {
-                    afterHtml += "<div class=\"page\" style=\"display: none\"></div>";
+                if (typeof pagesByUrl[url] == 'undefined') {
+                    pagesByUrl[url] = n;
+                    urlsByPages[n] = url;
+                    n++;
                 }
             }
-            $(beforeHtml).insertBefore($currentPage);
-            $(afterHtml).insertAfter($currentPage);
-
-            $pages = base.$el.children(".page");
-            $pages.not(".current-page").data("loaded", false);
-
-
-            base.$el.triggerHandler("depage.magaziner.initialized");
-
-            base.preloadPage(currentPage - 1);
-            base.preloadPage(currentPage + 1);
-
-            base.show(currentPage);
+            var currentLocation = document.location.href.replace(/#.*/, '');
+            if (typeof pagesByUrl[currentLocation] == 'undefined') {
+                base.currentPage = -1;
+            } else {
+                base.currentPage = pagesByUrl[currentLocation];
+            }
         };
         // }}}
         // {{{ registerEvents()
         base.registerEvents = function() {
-            // {{{ prevent default behaviour on touchmove to disable native scrolling
-            base.$el.on('touchmove', function (e) {
-                e.preventDefault();
-            });
-            // }}}
-
             // {{{ horizontal scrolling between pages
-            base.$el.hammer(hammerOptions).on("dragleft", function(e) {
-                $pages.each( function(i) {
-                    var $page = $(this);
-                    $page.css({
-                        left: (i - base.currentPage) * pageWidth + e.gesture.deltaX
-                    });
-                });
-            });
-            base.$el.hammer(hammerOptions).on("dragright", function(e) {
-                $pages.each( function(i) {
-                    var $page = $(this);
-                    $page.css({
-                        left: (i - base.currentPage) * pageWidth + e.gesture.deltaX
-                    });
-                });
-            });
-            // }}}
-            // {{{ vertical scrolling
-            base.$el.hammer(hammerOptions).on("dragup", function(e) {
-                base.$el.css({
-                    top: e.gesture.deltaY
-                });
-            });
-            base.$el.hammer(hammerOptions).on("dragdown", function(e) {
-                base.$el.css({
-                    top: e.gesture.deltaY
-                });
+            base.$el.hammer(hammerOptions).on("panleft panright", function(e) {
+                if (e.gesture.pointerType == "mouse" || pageScrolling || e.gesture.srcEvent.type == 'pointercancel') {
+                    return;
+                }
+                $prevPage.removeClass("animated");
+                $currentPage.removeClass("animated");
+                $nextPage.removeClass("animated");
+
+                base.setPagePos($prevPage, -1 * pageWidth + e.gesture.deltaX);
+                base.setPagePos($currentPage, e.gesture.deltaX);
+                base.setPagePos($nextPage, 1 * pageWidth + e.gesture.deltaX);
             });
             // }}}
             // {{{ dragend actions after horizontal or vertical scrolling
-            base.$el.hammer(hammerOptions).on("dragend", function(e) {
+            base.$el.hammer(hammerOptions).on("panend", function(e) {
+                if (e.gesture.pointerType == "mouse" || pageScrolling) {
+                    return;
+                }
                 var newXOffset = 0;
                 var newYOffset = 0;
+                var minVelocity = 0.1;
+                var minMovement = pageWidth / 7;
 
-                if (e.gesture.deltaX < - pageWidth / 3 || (e.gesture.deltaX < 0 && e.gesture.velocityX > 1)) {
+                if (e.gesture.deltaX < - minMovement || (e.gesture.deltaX < 0 && e.gesture.velocityX > minVelocity)) {
                     base.next();
-                } else if (e.gesture.deltaX > pageWidth / 3 || (e.gesture.deltaX > 0 && e.gesture.velocityX > 1)) {
+                } else if (e.gesture.deltaX > minMovement || (e.gesture.deltaX > 0 && e.gesture.velocityX > minVelocity)) {
                     base.prev();
                 } else {
                     base.show(base.currentPage);
                 }
-                if (e.gesture.deltaY < 0 && e.gesture.velocityY > 0.2) {
-                    newYOffset = -1;
-                } else if (e.gesture.deltaY > 0 && e.gesture.velocityY > 0.2) {
-                    newYOffset = 1;
-                }
-
-                // vertical scrolling on current page
-                base.$el.css({
-                    top: 0
-                });
-                var currentPos = $window.scrollTop() - e.gesture.deltaY;
-                var targetPos = $window.scrollTop() - e.gesture.deltaY - 300 * e.gesture.velocityY * newYOffset;
-
-                window.scrollTo(0, $window.scrollTop() - e.gesture.deltaY);
-
-                $pages.not(".current-page").css({
-                    top: currentPos
-                });
-
-                if (newYOffset !== 0) {
-                    $("html, body").animate({
-                        scrollTop: targetPos
-                    }, 300 * e.gesture.velocityY);
-                }
             });
             // }}}
             // {{{ key events
-            $document.on("keyup", function(e) {
+            $document.on("keydown", function(e) {
+                // @todo fixed keyboard repeat
                 if ($(document.activeElement).is(':input')){
                     // continue only if an input is not the focus
                     return true;
@@ -281,29 +301,24 @@
                         base.prev();
                         e.preventDefault();
                         break;
+                    case 40 : // cursor down
                     case 74 : // vim nav: j
-                        window.scrollTo(0, $window.scrollTop() + 50);
+                        $currentPage.scrollTop($currentPage.scrollTop() + 50);
                         e.preventDefault();
                         break;
+                    case 38 : // cursor up
                     case 75 : // vim nav: k
-                        window.scrollTo(0, $window.scrollTop() - 50);
+                        $currentPage.scrollTop($currentPage.scrollTop() - 50);
                         e.preventDefault();
                         break;
                 }
             });
             // }}}
 
-            // {{{ scroll event
-            $window.scroll( function() {
-                $pages.not(".current-page").css({
-                    top: $window.scrollTop()
-                });
-            });
-            // }}}
             // {{{ resize event
             var onResize =  function() {
                 pageWidth = base.$el.width();
-                base.show(base.currentPage);
+                base.show(base.currentPage, false);
             };
 
             $window.on("resize", function() {
@@ -311,23 +326,22 @@
             });
             // }}}
 
-            // {{{ statechange event
-            $window.bind("statechange", function() {
+            // {{{ popstate event
+            $window.on("popstate", function() {
                 var
-                    State = History.getState(),
-                    url = State.url,
+                    url = window.location.href,
                     relativeUrl = url.replace(rootUrl,'');
 
-                if (typeof pagesByUrl[url] !== undefined) {
-                    base.show(pagesByUrl[url]);
+                if (typeof pagesByUrl[url] !== 'undefined') {
+                    base.show(pagesByUrl[url], true);
+                } else {
+                    base.load(url);
                 }
             });
             // }}}
             // {{{ statechangecomplete event
-            $window.bind("statechangecomplete", function() {
+            base.$el.on("depage.magaziner.statechangecomplete", function(url, $page) {
                 var
-                    State = History.getState(),
-                    url = State.url,
                     title = $currentPage.data("title");
 
                 if (title) {
@@ -338,6 +352,10 @@
                     }
                     catch ( Exception ) { }
                 }
+
+                $body.attr("class", $currentPage.data("classes"));
+
+                base.initPageLinks();
 
                 // Inform Google Analytics of the change
                 if ( typeof window._gaq !== 'undefined' ) {
@@ -359,16 +377,37 @@
         };
         // }}}
 
-        // {{{ showPagesAround(n)
-        base.showPagesAround = function(n) {
-            $pages.eq(n - 1).show();
-            $pages.eq(n).show();
-            $pages.eq(n + 1).show();
+        // {{{ triggerShowLoaded()
+        base.triggerShowLoaded = function(url, $page) {
+            if (url === window.location.href) {
+                base.$el.trigger("depage.magaziner.statechangecomplete", [url, $page]);
+            }
         };
         // }}}
-        // {{{ preloadPage()
-        base.preloadPage = function(n) {
-            if (n < 0 || n >= $pages.length) {
+        // {{{ resetScroll()
+        base.resetScroll = function() {
+            $prevPage.scrollTop(0);
+            $nextPage.scrollTop(0);
+        };
+        // }}}
+        // {{{ getPageByNumber
+        base.getPageByNumber = function(n) {
+            var $page;
+
+            if (n == base.currentPage) {
+                $page = $currentPage;
+            } else if (n == base.currentPage - 1) {
+                $page = $prevPage;
+            } else if (n == base.currentPage + 1) {
+                $page = $nextPage;
+            }
+
+            return $page;
+        };
+        // }}}
+        // {{{ preloadPageByNumber()
+        base.preloadPageByNumber = function(n) {
+            if (n < 0 || n >= urlsByPages.length) {
                 return;
             }
             var url = urlsByPages[n];
@@ -377,26 +416,37 @@
                 return;
             }
 
-            // Prepare Variables
-            var relativeUrl = url.replace(rootUrl,'');
-
             // get page element for current url
-            var $page = $pages.eq(n);
+            var $page = base.getPageByNumber(n);
 
-            if ($page.data("loaded")) {
-                // data is already loaded into element
-                if (url ===  document.location.href) {
-                    $window.trigger("statechangecomplete");
-                }
+            base.preloadPage($page, url);
+        };
+        // }}}
+        // {{{ preloadPage()
+        base.preloadPage = function($page, url) {
+            if (!$page) {
+                return true;
+            } else if ($page.data("loaded")) {
+                base.triggerShowLoaded(url, $page);
 
+                return true;
+            } else if ($page.data("loading")) {
                 return true;
             }
 
-            $page.addClass("loading");
+            $page
+                .data("loading", true);
+
+            setTimeout(function() {
+                if ($page.data("loading")) {
+                    $page.addClass("loading");
+                }
+            }, 10);
 
             // Ajax Request the Traditional Page
             $.ajax({
                 url: url,
+                timeout: 5000,
                 success: function(data, textStatus, jqXHR){
                     // Prepare
                     var
@@ -412,7 +462,7 @@
                         $scripts.detach();
                     }
 
-                    $data.find("a:internal").each( function() {
+                    $data.find("a[href]:internal").each( function() {
                         var $el = $(this);
                         $el.attr("href", makeAbsolute(url, $el.attr("href")));
                     });
@@ -438,79 +488,183 @@
                         //contentNode.appendChild(scriptNode);
                     });
 
-                    $body.attr('class', $dataBody.attr("class"));
-                    $body.removeClass('document-body');
+                    $dataBody
+                        .removeClass('document-body');
 
-                    $page.removeClass('loading');
-                    $page.data("loaded", true);
-                    $page.data("title", $data.find('.document-title:first').text());
+                    $page
+                        .removeClass('loading')
+                        .data("loading", false)
+                        .data("loaded", true)
+                        .data("classes", $dataBody.attr("class"))
+                        .data("title", $data.find('.document-title:first').text());
 
-                    if (url === document.location.href) {
-                        $window.trigger("statechangecomplete");
-                    }
+                    base.$el.trigger("depage.magaziner.loaded", [url, $page]);
+                    base.$el.trigger("depage.magaziner.show", [url, $page]);
+                    base.triggerShowLoaded(url, $page);
                 },
                 error: function(jqXHR, textStatus, errorThrown){
-                    document.location.href = url;
-                    return false;
+                    $page
+                        .removeClass('loading')
+                        .data("loading", false)
+                        .data("loaded", false);
+
+                    if (url === document.location.href) {
+                        // only when page is current page
+                        document.location.href = url;
+                        return false;
+                    }
                 }
             }); // end ajax
         };
         // }}}
-        // {{{ clearPage()
-        base.clearPage = function(n) {
-            var $page = $pages.eq(n);
-
-            $page.data("loaded", false);
-            $page.empty();
+        // {{{ getNewPage
+        base.getNewPage = function() {
+            return $(pageHtml)
+                .data("loaded", false)
+                .data("loading", false)
+                .appendTo(base.$el);
+        };
+        // }}}
+        // {{{ setPagePos()
+        base.setPagePos = function($page, newPos) {
+            if (hasCssVariables) {
+                $page[0].style.setProperty('--pageTranslateX', newPos + "px");
+            } else {
+                $page.css({
+                    "transform": "translateX(" + newPos + "px)"
+                });
+            }
         };
         // }}}
         // {{{ show()
-        base.show = function(n) {
-            var resetScroll = base.currentPage != n;
+        base.show = function(n, animated, hash) {
+            if (typeof animated == 'undefined') animated = true;
+            if (typeof hash == 'undefined') hash = '';
+
+            var isNewPage = base.currentPage !== n;
+            var prevAnimated = animated;
+            var nextAnimated = animated;
+            var posDiff = n - base.currentPage;
+
+            if (isNewPage) {
+                if (posDiff > 1 || posDiff < -1) {
+                    $prevPage.remove();
+                    $currentPage.remove();
+                    $nextPage.remove();
+
+                    $prevPage = base.getNewPage();
+                    $currentPage = base.getNewPage();
+                    $nextPage = base.getNewPage();
+
+                    prevAnimated = false;
+                    nextAnimated = false;
+                } else if (posDiff == 1) {
+                    $prevPage.remove();
+                    $prevPage = $currentPage;
+                    $currentPage = $nextPage;
+                    $nextPage = base.getNewPage();
+
+                    nextAnimated = false;
+                } else if (posDiff == -1) {
+                    $nextPage.remove();
+                    $nextPage = $currentPage;
+                    $currentPage = $prevPage;
+                    $prevPage = base.getNewPage();
+
+                    prevAnimated = false;
+                }
+            }
+
+            $prevPage.toggleClass("animated", prevAnimated);
+            $currentPage.toggleClass("animated", animated);
+            $nextPage.toggleClass("animated", nextAnimated);
 
             base.currentPage = n;
-            base.showPagesAround(base.currentPage);
-            base.preloadPage(n);
 
-            // horizontal scrolling between pages
-            $pages.each( function(i) {
-                var $page = $(this);
-                $page.stop().animate({
-                    left: (i - base.currentPage) * pageWidth
-                }, speed);
-            });
-            if (resetScroll) {
-                $pages.last().queue( function() {
-                    window.scrollTo(0, 0);
+            if (hash != '') {
+                var $target = $currentPage.find(hash);
+                var scrollTo = 0;
 
-                    $pages.css({
-                        top: 0
-                    });
-                    $pages.hide();
-                    base.showPagesAround(base.currentPage);
-
-                    base.preloadPage(base.currentPage - 1);
-                    base.preloadPage(base.currentPage + 1);
-                });
-
-                $pages.removeClass("current-page");
-                $currentPage = $pages.eq(n);
-                $currentPage.addClass("current-page");
-
-                base.$el.triggerHandler("depage.magaziner.show", [n]);
+                if ($target.length > 0) {
+                    scrollTo = $target.offset().top - base.options.scrollOffset + $currentPage.scrollTop();
+                }
+                if (scrollTo == $currentPage.scrollTop()) {
+                    $currentPage.scroll();
+                } else if (animated) {
+                    $currentPage.animate({scrollTop:scrollTo}, 300);
+                } else {
+                    $currentPage.scrollTop(scrollTo);
+                }
             }
 
-            if (resetScroll && document.location.href != urlsByPages[base.currentPage]) {
+            if (isNewPage && document.location.href != urlsByPages[base.currentPage]) {
                 History.pushState(null, null, urlsByPages[base.currentPage]);
             }
+
+            base.preloadPageByNumber(n);
+
+            // horizontal scrolling between pages
+            base.setPagePos($prevPage, -1 * pageWidth);
+            base.setPagePos($currentPage, 0);
+            base.setPagePos($nextPage, 1 * pageWidth);
+
+            if (isNewPage) {
+                $(".current-page")
+                    .removeClass("current-page")
+                    .off("scroll");
+
+                $currentPage.addClass("current-page");
+
+                $currentPage.on("scroll", function() {
+                    pageScrolling = true;
+                    clearTimeout(pageScrollingTimeout);
+
+                    pageScrollingTimeout = setTimeout(function() {
+                        pageScrolling = false;
+                    }, 250);
+                });
+
+                base.$el.trigger("depage.magaziner.show", [urlsByPages[n], $currentPage]);
+
+                setTimeout(function() {
+                    base.preloadPageByNumber(base.currentPage - 1);
+                    base.preloadPageByNumber(base.currentPage + 1);
+
+                    base.resetScroll();
+                }, 500);
+            }
+        };
+        // }}}
+        // {{{ load
+        base.load = function(url) {
+            // loading page not in page list
+
+            $prevPage.remove();
+            $currentPage.remove();
+            $nextPage.remove();
+
+            $prevPage = base.getNewPage();
+            $currentPage = base.getNewPage().addClass("current-page");
+            $nextPage = base.getNewPage();
+
+            History.pushState(null, null, url);
+
+            base.setPagePos($prevPage, -1 * pageWidth);
+            base.setPagePos($currentPage, 0);
+            base.setPagePos($nextPage, 1 * pageWidth);
+
+            setTimeout(function() {
+                base.currentPage = -1;
+                base.preloadPage($currentPage, url);
+            }, 50);
         };
         // }}}
         // {{{ next()
         base.next = function() {
-            if (base.currentPage < $pages.length - 1) {
+            if (base.currentPage < urlsByPages.length - 1) {
                 // scroll to next page
                 base.show(base.currentPage + 1);
-                base.$el.triggerHandler("depage.magaziner.next");
+                base.$el.trigger("depage.magaziner.next");
 
             } else {
                 base.show(base.currentPage);
@@ -522,7 +676,7 @@
             if (base.currentPage > 0) {
                 // scroll to previous page
                 base.show(base.currentPage - 1);
-                base.$el.triggerHandler("depage.magaziner.prev");
+                base.$el.trigger("depage.magaziner.prev");
             } else {
                 base.show(base.currentPage);
             }
@@ -534,7 +688,7 @@
     };
 
     $.depage.magaziner.defaultOptions = {
-        option1: "default"
+        scrollOffset: 0
     };
 
     $.fn.depageMagaziner = function(pagelinkSelector, options){
