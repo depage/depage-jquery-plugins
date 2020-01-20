@@ -16,49 +16,7 @@
     }
 
     var cookieName = config.cookieName || "privacy-policy-accepted";
-    var lang = $('html').attr('lang');
-
-    var startTracking = function() {
-        Cookies.set(cookieName, "true", { expires: 30 * 24 * 60 * 60 }); // expires in 30 days
-
-        if (config.matomo) {
-            startMatomo();
-        }
-        if (config.ga) {
-            startGoogleAnalytics();
-        }
-    }
-
-    var startMatomo = function() {
-        w._paq = w._paq || [];
-
-        if (config.matomo.domain) {
-            w._gaq.push(['_setDomainName', config.matomo.domain]);
-        }
-        w._paq.push(['trackPageView']);
-        w._paq.push(['enableLinkTracking']);
-        w._paq.push(['enableHeartBeatTimer']);
-        w._paq.push(['setTrackerUrl', config.matomo.url + 'matomo.php']);
-        w._paq.push(['setSiteId', config.matomo.siteId]);
-
-        loadScript(config.matomo.url + 'matomo.js');
-    }
-
-    var startGoogleAnalytics = function() {
-        loadScript('https://www.googletagmanager.com/gtag/js?id=' + config.ga.account);
-
-        w.dataLayer = w.dataLayer || [];
-        w.gtag = function(){
-            w.dataLayer.push(arguments);
-        }
-
-        w.gtag('js', new Date());
-        w.gtag('set', {
-            'anonymize_ip': true,
-            'allow_ad_personalization_signals': false
-        });
-        w.gtag('config', config.ga.account);
-    }
+    var lang = $('html').attr('lang') || "en";
 
     var loadScript = function(url) {
         var script = document.createElement('script'),
@@ -83,14 +41,29 @@
         // Add a reverse reference to the DOM object
         base.$el.data("depage.analytics", base);
 
+        // {{{ init()
         base.init = function() {
             base.options = $.extend({},$.depage.analytics.defaultOptions, options);
 
+            if (Cookies.get(cookieName) === "false") {
+                return;
+            }
+            if (Cookies.get(cookieName) === "true") {
+                base.startTracking();
+
+                return;
+            }
+
+            base.displayPrivacyBadger();
+        };
+        // }}}
+        // {{{ displayPrivacyBadger()
+        base.displayPrivacyBadger = function() {
             var $html = $("<div class=\"privacy-badger\"></div>");
             var $message = $("<p></p>");
             var $buttonWrapper = $("<div class=\"button-wrapper\"></div>");
-            var $accept = $("<a></a>");
-            var $cancel = $("<a></a>");
+            var $accept = $("<button></button>");
+            var $cancel = $("<button></button>");
 
             $message
                 .html(base.options.messageHtml.replace("{$privacyPolicyLink}", base.options.privacyPolicyLink))
@@ -104,7 +77,7 @@
                 .on("click", function() {
                     $html.remove();
 
-                    startTracking();
+                    base.startTracking();
                 });
             $cancel
                 .text(base.options.rejectText)
@@ -117,10 +90,53 @@
 
             $html.appendTo(base.$el);
         };
+        // }}}
 
-        if (Cookies.get(cookieName) === "true" || Cookies.get(cookieName) === "false") {
-            return;
+        // {{{ startTracking()
+        base.startTracking = function() {
+            Cookies.set(cookieName, "true", { expires: 30 * 24 * 60 * 60 }); // expires in 30 days
+
+            if (base.options.matomo) {
+                base.startMatomo();
+            }
+            if (base.options.ga) {
+                base.startGoogleAnalytics();
+            }
         }
+        // }}}
+        // {{{ startMatomo()
+        base.startMatomo = function() {
+            w._paq = w._paq || [];
+
+            if (base.options.matomo.domain) {
+                w._gaq.push(['_setDomainName', base.options.matomo.domain]);
+            }
+            w._paq.push(['trackPageView']);
+            w._paq.push(['enableLinkTracking']);
+            w._paq.push(['enableHeartBeatTimer']);
+            w._paq.push(['setTrackerUrl', base.options.matomo.url + 'matomo.php']);
+            w._paq.push(['setSiteId', base.options.matomo.siteId]);
+
+            loadScript(base.options.matomo.url + 'matomo.js');
+        }
+        // }}}
+        // {{{ startGoogleAnalytics()
+        base.startGoogleAnalytics = function() {
+            loadScript('https://www.googletagmanager.com/gtag/js?id=' + base.options.ga.account);
+
+            w.dataLayer = w.dataLayer || [];
+            w.gtag = function(){
+                w.dataLayer.push(arguments);
+            }
+
+            w.gtag('js', new Date());
+            w.gtag('set', {
+                'anonymize_ip': true,
+                'allow_ad_personalization_signals': false
+            });
+            w.gtag('config', base.options.ga.account);
+        }
+        // }}}
 
         // Run initializer
         base.init();
@@ -128,6 +144,9 @@
 
     $.depage.analytics.defaultOptions = {
         messageHtml: "We use cookies and similar technologies to understand how you use our services and improve your experience. By clicking 'Accept', you accept all cookies. Otherwise we use only functionally essential cookies. For more information, please see our <a href=\"{$privacyPolicyLink}\">Data Protection Policy</a>",
+        depageIsLive: typeof config.depageIsLive != 'undefined' ? config.depageIsLive : true,
+        matomo: config.matomo || false,
+        ga: config.ga || false,
         privacyPolicyLink: config.privacyPolicyLink || "",
         acceptText: "Accept cookies",
         rejectText: "Reject"
@@ -144,8 +163,6 @@
             (new $.depage.analytics(this, options));
         });
     };
-
-    if (Cookies.get(cookieName) === "true") {
-        startTracking();
-    }
 })(jQuery, window, depageAnalyticsConfig);
+
+// vim:set ft=javascript sw=4 sts=4 fdm=marker :
