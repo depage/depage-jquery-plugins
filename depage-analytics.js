@@ -134,7 +134,7 @@
     };
 
     if (lang == "de") {
-        $.depage.analytics.defaultOptions.messageHtml = "Um unseren Webauftritt für Sie optimal zu gestalten und fortlaufend verbessern zu können, verwenden wir Cookies. Wenn Sie 'Akzeptieren' klicken, stimmen Sie der Verwendung aller Cookies zu. Andernfalls verwenden wir nur funktionell unverzichtbare Cookies. Weitere Informationen, erhalten Sie in unserer <a href=\"{$privacyPolicyLink}\">Datenschutzerklärung für Webseitenbenutzer</a>.";
+        $.depage.analytics.defaultOptions.messageHtml = "Um unseren Webauftritt für Sie optimal zu gestalten und fortlaufend verbessern zu können, verwenden wir Cookies. Wenn Sie 'Akzeptieren' klicken, stimmen Sie der Verwendung aller Cookies zu. Andernfalls verwenden wir nur funktional unverzichtbare Cookies. Weitere Informationen, erhalten Sie in unserer <a href=\"{$privacyPolicyLink}\">Datenschutzerklärung für Webseitenbenutzer</a>.";
         $.depage.analytics.defaultOptions.acceptText = "Cookies akzeptieren";
         $.depage.analytics.defaultOptions.rejectText = "Ablehnen";
     }
