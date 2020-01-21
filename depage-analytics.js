@@ -33,6 +33,7 @@
     $.depage.analytics = function(el, options){
         // To avoid scope issues, use 'base' instead of 'this' to reference this class from internal events and functions.
         var base = this;
+        var $html = $("<div class=\"privacy-badger\"></div>");
 
         // Access to jQuery and DOM versions of element
         base.$el = $(el);
@@ -54,12 +55,11 @@
                 return;
             }
 
-            base.displayPrivacyBadger();
+            base.show();
         };
         // }}}
         // {{{ displayPrivacyBadger()
-        base.displayPrivacyBadger = function() {
-            var $html = $("<div class=\"privacy-badger\"></div>");
+        base.show = function() {
             var $message = $("<p></p>");
             var $buttonWrapper = $("<div class=\"button-wrapper\"></div>");
             var $accept = $("<button></button>");
@@ -75,7 +75,7 @@
                 .attr("class", "accept")
                 .appendTo($buttonWrapper)
                 .on("click", function() {
-                    $html.remove();
+                    base.hide();
 
                     base.startTracking();
                 });
@@ -84,18 +84,31 @@
                 .attr("class", "reject")
                 .appendTo($buttonWrapper)
                 .on("click", function() {
-                    $html.remove();
-                    Cookies.set(cookieName, "false", { expires: 30 * 24 * 60 * 60 }); // expires in 30 days
+                    base.hide();
+
+                    Cookies.set(cookieName, "false", { expires: base.options.expires });
                 });
 
-            $html.appendTo(base.$el);
+            $html.hide().appendTo(base.$el).fadeIn();
         };
         // }}}
+        // {{{
+        base.hide = function( ){
+            $html.fadeOut({
+                complete: function() {
+                    $html.remove();
+                }
+            });
+        }
+        // }}}
 
         // {{{ startTracking()
         base.startTracking = function() {
-            Cookies.set(cookieName, "true", { expires: 30 * 24 * 60 * 60 }); // expires in 30 days
+            Cookies.set(cookieName, "true", { expires: base.options.expires });
 
+            if (!base.options.depageIsLive) {
+                return;
+            }
             if (base.options.matomo) {
                 base.startMatomo();
             }
@@ -149,11 +162,12 @@
         ga: config.ga || false,
         privacyPolicyLink: config.privacyPolicyLink || "",
         acceptText: "Accept cookies",
-        rejectText: "Reject"
+        rejectText: "Reject",
+        expires: 3 * 30 * 24 * 60 * 60 // 3 months
     };
 
     if (lang == "de") {
-        $.depage.analytics.defaultOptions.messageHtml = "Um unseren Webauftritt für Sie optimal zu gestalten und fortlaufend verbessern zu können, verwenden wir Cookies. Wenn Sie 'Akzeptieren' klicken, stimmen Sie der Verwendung aller Cookies zu. Andernfalls verwenden wir nur funktional unverzichtbare Cookies. Weitere Informationen, erhalten Sie in unserer <a href=\"{$privacyPolicyLink}\">Datenschutzerklärung für Webseitenbenutzer</a>.";
+        $.depage.analytics.defaultOptions.messageHtml = "Um unseren Webauftritt für Sie optimal zu gestalten und fortlaufend verbessern zu können, verwenden wir Cookies. Wenn Sie 'Akzeptieren' klicken, stimmen Sie der Verwendung aller Cookies zu. Andernfalls verwenden wir nur funktional unverzichtbare Cookies. Weitere Informationen, erhalten Sie in unserer <a href=\"{$privacyPolicyLink}\">Datenschutzerklärung</a>.";
         $.depage.analytics.defaultOptions.acceptText = "Cookies akzeptieren";
         $.depage.analytics.defaultOptions.rejectText = "Ablehnen";
     }
