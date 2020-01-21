@@ -10,11 +10,12 @@
  *
  * @author    Frank Hellenkamp [jonas@depage.net]
  **/
-;(function($, w, config){
+;(function($, w){
     if(!$.depage){
         $.depage = {};
     }
 
+    var config = w.depageAnalyticsConfig || {};
     var cookieName = config.cookieName || "privacy-policy-accepted";
     var lang = $('html').attr('lang') || "en";
 
@@ -177,6 +178,6 @@
             (new $.depage.analytics(this, options));
         });
     };
-})(jQuery, window, depageAnalyticsConfig);
+})(jQuery, window);
 
 // vim:set ft=javascript sw=4 sts=4 fdm=marker :
