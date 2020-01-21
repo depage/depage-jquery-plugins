@@ -29,7 +29,14 @@
             // Put your initialization code here
             base.$el.on("click", base.toggleHelp);
 
-            //base.showHelp();
+            $("body").on("keyup", function(e) {
+                if (e.shiftKey && e.keyCode == 63 && e.target == this) {
+                    base.toggleHelp();
+                }
+                if (e.keyCode == 27 && base.$helpPane) {
+                    base.hideHelp();
+                }
+            });
 
             $window.on("resize scroll", onResize);
         };
