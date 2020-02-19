@@ -47,6 +47,11 @@
             base.options = $.extend({}, $.depage.address.defaultOptions, options);
             $country = $(base.options.country_selector, base.$el);
             $state = $(base.options.state_selector, base.$el);
+
+            if ($country.length == 0 || $state.length == 0) {
+                return;
+            }
+
             base.address();
         };
         // }}}
@@ -58,6 +63,20 @@
          * @return void
          */
         base.address = function(){
+            if (typeof $.fn.selectize !== 'undefined') {
+                base.addressSelectized();
+            } else {
+                base.addressHtml();
+            }
+        };
+        /// }}}
+        // {{{ addressHtml()
+        /**
+         * address
+         *
+         * @return void
+         */
+        base.addressHtml = function(){
             var $optgroups = $state.find('optgroup');
             var filter = function() {
                 $optgroup = $optgroups.filter("[label='" + $country.val() + "']");
@@ -69,6 +88,41 @@
                     $state.parents('.skin-select').hide();
                 }
             };
+
+            $country.change(filter);
+            filter();
+        };
+        /// }}}
+        // {{{ addressSelectized()
+        /**
+         * address
+         *
+         * @return void
+         */
+        base.addressSelectized = function(){
+            var oldState = $state.val();
+            var stateSel = $state[0].selectize;
+            var allStates = JSON.parse(JSON.stringify(stateSel.options));
+            var filter = function() {
+                var country = $country.val();
+                stateSel.clearOptions();
+
+                if (country == "") {
+                    return;
+                }
+                for (var s in allStates) {
+                    if (allStates[s].optgroup == country) {
+                        stateSel.addOption(allStates[s]);
+                    }
+                }
+                if (Object.keys(stateSel.options).length > 0) {
+                    stateSel.addItem(oldState, false);
+                    $state.parents('.skin-select').show();
+                } else {
+                    $state.parents('.skin-select').hide();
+                }
+            };
+
             $country.change(filter);
             filter();
         };
