@@ -6,7 +6,7 @@
  * adds a custom slideshow
  *
  *
- * copyright (c) 2006-2013 Frank Hellenkamp [jonas@depage.net]
+ * copyright (c) 2006-2020 Frank Hellenkamp [jonas@depage.net]
  *
  * @author    Frank Hellenkamp [jonas@depage.net]
  **/
@@ -204,7 +204,7 @@
         /* }}} */
         /* {{{ show() */
         base.show = function(n, waitForImagesToLoad, customSpeed) {
-            waitForImagesToLoad = (typeof force === "undefined") ? !base.options.waitForImagesToLoad : waitForImagesToLoad;
+            waitForImagesToLoad = (typeof waitForImagesToLoad === "undefined") ? base.options.waitForImagesToLoad : waitForImagesToLoad;
             if (waitForImagesToLoad && !base.imagesReadyFor(n)) {
                 setTimeout( function() { base.show(n); }, 100);
                 return false;
