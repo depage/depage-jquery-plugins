@@ -3,7 +3,7 @@
  *
  * Adds a custom audio player, using HTML5 audio element
  *
- * copyright (c) 2006-2012 Frank Hellenkamp [jonas@depage.net]
+ * copyright (c) 2006-2020 Frank Hellenkamp [jonas@depage.net]
  *
  * @author Ben Wallis
  */
@@ -107,6 +107,9 @@
          * @return void
          */
         base.audio = function() {
+            if (base.$el.data("initialized")) {
+                return;
+            }
             var support = base.audioSupport();
 
             // SET TO DEBUG FLASH MODE
@@ -134,6 +137,9 @@
             }
             base.addLegend(div);
             div.appendTo(base.$el);
+
+            base.$el.data("initialized", true);
+            base.$el.trigger("initialized");
         };
         // }}}
 
@@ -272,13 +278,13 @@
          * @return void
          */
         base.addLegend = function(div){
-            var requirements = $("p.requirements", base.$el);
-            var legend = $("p.legend", base.$el);
+            var $requirements = $("p.requirements", base.$el);
+            var $legend = $("p.legend", base.$el).show();
 
-            $("<p class=\"legend\"><span>" + legend.text() + "</span></p>").appendTo(div);
+            $legend.clone().appendTo(div);
 
-            legend.hide();
-            requirements.hide();
+            $legend.hide();
+            $requirements.hide();
 
             return div;
         };
@@ -370,6 +376,8 @@
          * @return void
          */
         base.onPlay = function() {
+            base.$el.addClass("playing");
+
             if (base.options.useCustomControls){
                 base.controls.play.hide();
                 base.controls.pause.show();
@@ -385,6 +393,7 @@
             if (typeof base.options.onPlay == 'function') {
                 base.options.onPlay();
             }
+            base.$el.trigger("play");
         };
         // }}}
         // {{{ onPause()
@@ -394,6 +403,8 @@
          * @return void
          */
         base.onPause = function() {
+            base.$el.removeClass("playing");
+
             if (base.options.useCustomControls){
                 base.controls.play.show();
                 base.controls.pause.hide();
@@ -403,6 +414,7 @@
             if (typeof base.options.onPause == 'function') {
                 base.options.onPause();
             }
+            base.$el.trigger("pause");
         };
         // }}}
         // {{{ end()
@@ -417,6 +429,7 @@
             if (typeof base.options.onEnd == 'function') {
                 base.options.onEnd();
             }
+            base.$el.trigger("ended");
         };
         // }}}
 
@@ -429,6 +442,8 @@
         base.setCurrentTime = function(currentTime) {
             base.controls.current.html(base.floatToTime(currentTime) + "/");
             base.controls.position.width(Math.min(currentTime / audio.duration * 100, 100) + "%");
+
+            base.$el.trigger("timeupdate");
         };
         // }}}
 
@@ -484,6 +499,10 @@
          */
         base.play = function() {
             base.player.play();
+
+            if ( typeof window._paq !== 'undefined' ) {
+                window._paq.push(['trackEvent', 'MediaAudio', 'Play', $("p.legend", base.$el).text()]);
+            }
         };
         // }}}
 
