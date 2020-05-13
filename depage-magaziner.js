@@ -35,7 +35,7 @@
     var pageScrollingTimeout;
     var pageHtml = "<div class=\"page\"></div>";
     var resizeTimer = null;
-    var preloadTimer = null;
+    var preloadPageTimer = null;
 
     // {{{ HTML Helper
     var documentHtml = function(html){
@@ -250,8 +250,12 @@
 
             base.show(base.currentPage);
 
-            base.preloadPageByNumber(base.currentPage - 1);
-            base.preloadPageByNumber(base.currentPage + 1);
+            if (base.options.preloadPageTimeout < 0) return;
+
+            preloadPageTimer = setTimeout(function() {
+                base.preloadPageByNumber(base.currentPage - 1);
+                base.preloadPageByNumber(base.currentPage + 1);
+            }, base.options.preloadPageTimeout);
         };
         // }}}
         // {{{ initPageLinks
@@ -646,6 +650,8 @@
                 History.pushState(null, null, urlsByPages[base.currentPage]);
             }
 
+            clearTimeout(preloadPageTimer);
+
             base.preloadPageByNumber(n);
             base.attachPage($currentPage);
 
@@ -668,8 +674,12 @@
                 base.$el.trigger("depage.magaziner.show", [urlsByPages[n], $currentPage]);
 
                 $currentPage.one(transitionEndEvent, function() {
-                    base.preloadPageByNumber(base.currentPage - 1);
-                    base.preloadPageByNumber(base.currentPage + 1);
+                    if (base.options.preloadPageTimeout < 0) return;
+
+                    preloadPageTimer = setTimeout(function() {
+                        base.preloadPageByNumber(base.currentPage - 1);
+                        base.preloadPageByNumber(base.currentPage + 1);
+                    }, base.options.preloadPageTimeout);
                 });
             }
             $currentPage.one(transitionEndEvent, function() {
@@ -721,6 +731,8 @@
 
             base.offsetPages(0);
 
+            clearTimeout(preloadPageTimer);
+
             setTimeout(function() {
                 base.currentPage = -1;
                 base.preloadPage($currentPage, url);
@@ -756,7 +768,8 @@
     };
 
     $.depage.magaziner.defaultOptions = {
-        scrollOffset: 0
+        scrollOffset: 0,
+        preloadPageTimeout: 1000
     };
 
     $.fn.depageMagaziner = function(pagelinkSelector, options){
