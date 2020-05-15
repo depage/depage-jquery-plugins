@@ -209,13 +209,14 @@
                     // Continue as normal for cmd clicks etc
                     if ( e.which == 2 || e.metaKey ) { return true; }
 
+                    $(this).blur();
+
                     if (typeof pagesByUrl[urlPath] !== 'undefined') {
                         base.show(pagesByUrl[urlPath], true, hash);
-                        return e.preventDefault();
                     } else {
                         base.load(url);
-                        return e.preventDefault();
                     }
+                    return e.preventDefault();
                 });
             });
 
