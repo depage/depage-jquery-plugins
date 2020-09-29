@@ -137,6 +137,7 @@
         // jquery object of body
         var $html = $("html");
         var $body = $("body");
+        var $head = $("head");
         var $window = $(window);
         var $document = $(document);
 
@@ -242,7 +243,8 @@
                 .data("loaded", true)
                 .data("loading", false)
                 .data("classes", $body.attr("class"))
-                .data("title", document.title);
+                .data("title", document.title)
+                .data("meta", $head.find("meta[name], meta[property]"));
 
             $prevPage = base.getNewPage();
             $nextPage = base.getNewPage();
@@ -386,7 +388,8 @@
             // {{{ statechangecomplete event
             base.$el.on("depage.magaziner.statechangecomplete", function(url, $page) {
                 var
-                    title = $currentPage.data("title");
+                    title = $currentPage.data("title"),
+                    $meta = $currentPage.data("meta");
 
                 if (title) {
                     // Update the title
@@ -395,6 +398,17 @@
                         document.getElementsByTagName('title')[0].innerHTML = document.title.replace('<','&lt;').replace('>','&gt;').replace(' & ',' &amp; ');
                     }
                     catch ( Exception ) { }
+                }
+                if ($meta) {
+                    $head.find("meta[name], meta[property]").remove();
+                    $meta.each(function() {
+                        var $m = $("<meta />");
+                        $.each(this.attributes, function(i, attrib){
+                            if (attrib.name == 'class') return;
+                            $m.attr(attrib.name, attrib.value);
+                        });
+                        $head.append($m);
+                    });
                 }
 
                 $body.attr("class", $currentPage.data("classes"));
@@ -532,7 +546,8 @@
                         .data("loading", false)
                         .data("loaded", true)
                         .data("classes", $dataBody.attr("class"))
-                        .data("title", $data.find('.document-title:first').text());
+                        .data("title", $data.find('.document-title:first').text())
+                        .data("meta", $data.find(".document-meta[name], .document-meta[property]"));
 
                     base.$el.trigger("depage.magaziner.loaded", [url, $page]);
                     base.$el.trigger("depage.magaziner.show", [url, $page]);
