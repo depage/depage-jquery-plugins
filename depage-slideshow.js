@@ -236,22 +236,28 @@
 
                 if (whichTransitionEvent) {
                     // css3 animation
-                    $div.css({
-                        opacity: 1
-                    }).one(whichTransitionEvent, function(e) {
-                        $div.css({visibility: "hidden"});
-                    }).css({
-                        opacity: 0
-                    });
+                    $div
+                        .css({
+                            opacity: 1
+                        })
+                        .off(whichTransitionEvent)
+                        .one(whichTransitionEvent, function(e) {
+                            $div.css({visibility: "hidden"});
+                        })
+                        .css({
+                            opacity: 0
+                        });
                 } else {
                     // javascript animation
-                    $div.css({
-                        opacity: 1
-                    }).animate({
-                        opacity: 0
-                    }, customSpeed, function() {
-                        $div.css({visibility: "hidden"});
-                    });
+                    $div
+                        .css({
+                            opacity: 1
+                        })
+                        .animate({
+                            opacity: 0
+                        }, customSpeed, function() {
+                            $div.css({visibility: "hidden"});
+                        });
                 }
             });
 
@@ -260,24 +266,29 @@
             // fadein next slide
             if (whichTransitionEvent) {
                 // css3 animation
-                $(divs[n]).css({
-                    visibility: "visible",
-                    opacity: 0
-                }).one(whichTransitionEvent, function(e) {
-                    base.waitForNext();
-                }).css({
-                    opacity: 1
-                });
+                $(divs[n])
+                    .css({
+                        visibility: "visible",
+                        opacity: 0
+                    })
+                    .off(whichTransitionEvent)
+                    .one(whichTransitionEvent, function() {
+                        base.waitForNext();
+                    }).css({
+                        opacity: 1
+                    });
             } else {
                 // javascript animation
-                $(divs[n]).css({
-                    visibility: "visible",
-                    opacity: 0
-                }).animate({
-                    opacity: 1
-                }, base.options.speed, function() {
-                    base.waitForNext();
-                });
+                $(divs[n])
+                    .css({
+                        visibility: "visible",
+                        opacity: 0
+                    })
+                    .animate({
+                        opacity: 1
+                    }, base.options.speed, function() {
+                        base.waitForNext();
+                    });
             }
         };
         /* }}} */
