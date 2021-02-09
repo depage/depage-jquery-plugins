@@ -87,7 +87,10 @@
                 .on("click", function() {
                     base.hide();
 
-                    Cookies.set(cookieName, "false", { expires: base.options.expires });
+                    Cookies.set(cookieName, "false", {
+                        expires: base.options.expires,
+                        sameSite: "lax"
+                    });
                 });
 
             $html.hide().appendTo(base.$el).fadeIn();
@@ -105,7 +108,10 @@
 
         // {{{ startTracking()
         base.startTracking = function() {
-            Cookies.set(cookieName, "true", { expires: base.options.expires });
+            Cookies.set(cookieName, "true", {
+                expires: base.options.expires,
+                sameSite: "lax"
+            });
 
             if (!base.options.depageIsLive) {
                 return;
