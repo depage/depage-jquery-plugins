@@ -257,10 +257,6 @@
                 if (('draggable' in div) || ('ondragstart' in div && 'ondrop' in div && !!window.FileReader)) {
                     base.options.$drop_area.addClass("has-drop-support");
 
-                    // TODO deprecate on jquery upgrade
-                    // fix for jquery 1.7 bug http://bugs.jquery.com/ticket/10756
-                    $.event.fixHooks.drop = { props:["dataTransfer"] };
-
                     $(document)
                         .on('dragover', function () {
                             base.options.$drop_area.addClass('drag-over'); return false;
