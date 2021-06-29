@@ -1,4 +1,6 @@
 /* {{{ depage-shy-dialogue */
+@use "sass:math";
+
 @mixin radius($radius, $vert: "", $horiz: "") {
     $other: "";
     $moz: "";
@@ -77,10 +79,10 @@
     $default-multiplier: 2;
 
     a.button {
-        @include radius($corner-radius / 2);
+        @include radius($corner-radius * 0.5);
         display: block;
         float: left;
-        padding: ($corner-radius / 3);
+        padding: math.div($corner-radius, 3);
         margin-top: 1em * $default-multiplier - 1em;
         margin-right: 0.2em;
         border: 1px solid $background;
@@ -98,7 +100,7 @@
         font-weight: bold;
         font-size: 1em * $default-multiplier;
         margin-top: 0;
-        padding: ($corner-radius / 4);
+        padding: ($corner-radius * 0.25);
     }
 
     .direction-marker {

@@ -1,4 +1,6 @@
 // {{{ mixin: text-shadow
+@use "sass:math";
+
 @mixin text-shadow($properties) {
     -webkit-text-shadow: $properties;
     -moz-text-shadow: $properties;
@@ -174,7 +176,7 @@
             width: $buttonSize;
             height: $buttonSize;
 
-            @include depage-player-icon($buttonSize / 3 * 1.8);
+            @include depage-player-icon(math.div($buttonSize, 3) * 1.8);
         }
         .progress {
             position: relative;
