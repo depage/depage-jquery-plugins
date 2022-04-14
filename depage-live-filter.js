@@ -40,12 +40,7 @@
             }
 
             // Put your initialization code here
-            var $container = $("<div class=\"" + base.options.inputClass +  "\"></div>");
-            if (base.options.inputParent === null) {
-                $container.insertBefore(base.$el);
-            } else {
-                $container.appendTo(base.options.inputParent);
-            }
+            var $container = $("<div class=\"" + base.options.inputClass +  "\"></div>").insertBefore(base.$el);
             base.$input = $("<input type=\"search\" placeholder=\"" + base.options.placeholder + "\"" + extraAttr + ">").prependTo($container);
 
             if (base.options.autofocus) {
@@ -113,7 +108,6 @@
     };
 
     $.depage.liveFilter.defaultOptions = {
-        inputParent: null,
         inputClass: "depage-live-filter",
         placeholder: "Search",
         autofocus: false

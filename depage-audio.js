@@ -3,7 +3,7 @@
  *
  * Adds a custom audio player, using HTML5 audio element
  *
- * copyright (c) 2006-2020 Frank Hellenkamp [jonas@depage.net]
+ * copyright (c) 2006-2012 Frank Hellenkamp [jonas@depage.net]
  *
  * @author Ben Wallis
  */

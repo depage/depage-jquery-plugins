@@ -7,7 +7,7 @@
  * adds a magazine like navigation to a website
  *
  *
- * copyright (c) 2013-2020 Frank Hellenkamp [jonas@depage.net]
+ * copyright (c) 2013-2021 Frank Hellenkamp [jonas@depage.net]
  *
  * @author    Frank Hellenkamp [jonas@depage.net]
  **/
@@ -155,12 +155,10 @@
         // global hammer options to drag only in one direction
         delete Hammer.defaults.cssProps.userSelect;
         var hammerOptions = {
-            threshold: 30,
-            //touchAction: "none",
-            //touchAction: "pan-y pan-x",
-            touchAction: "pan-y",
+            threshold: 100,
+            //touchAction: "pan-y",
+            domEvents: false,
             direction: Hammer.DIRECTION_HORIZONTAL
-            //direction: Hammer.DIRECTION_ALL
         };
         if (pageWidth > 1000) {
             hammerOptions.threshold *= 2;
@@ -253,12 +251,7 @@
 
             base.show(base.currentPage);
 
-            if (base.options.preloadPageTimeout < 0) return;
-
-            preloadPageTimer = setTimeout(function() {
-                base.preloadPageByNumber(base.currentPage - 1);
-                base.preloadPageByNumber(base.currentPage + 1);
-            }, base.options.preloadPageTimeout);
+            base.schedulePagePreload();
         };
         // }}}
         // {{{ initPageLinks
@@ -428,6 +421,11 @@
                 if ( typeof window._paq !== 'undefined' ) {
                     window._paq.push(['trackPageView', url]);
                 }
+
+                // Inform pinterest of the change
+                if ( typeof window.pintrk !== 'undefined' ) {
+                    window.pintrk('track', 'pagevisit');
+                }
             });
             // }}}
         };
@@ -453,6 +451,19 @@
             }
 
             return $page;
+        };
+        // }}}
+        // {{{ schedulePagePreload()
+        base.schedulePagePreload = function(n) {
+            if (base.options.preloadPageTimeout < 0) return;
+
+            preloadPageTimer = setTimeout(function() {
+                base.preloadPageByNumber(base.currentPage + 1);
+
+                preloadPageTimer = setTimeout(function() {
+                    base.preloadPageByNumber(base.currentPage - 1);
+                }, base.options.preloadPageTimeout);
+            }, base.options.preloadPageTimeout);
         };
         // }}}
         // {{{ preloadPageByNumber()
@@ -635,15 +646,7 @@
             var posDiff = n - base.currentPage;
 
             if (isNewPage) {
-                if (posDiff > 1 || posDiff < -1) {
-                    $prevPage.remove();
-                    $currentPage.remove();
-                    $nextPage.remove();
-
-                    $prevPage = base.getNewPage();
-                    $currentPage = base.getNewPage();
-                    $nextPage = base.getNewPage();
-                } else if (posDiff == 1) {
+                if (posDiff == 1) {
                     $prevPage.remove();
                     $prevPage = $currentPage;
                     $currentPage = $nextPage;
@@ -655,6 +658,14 @@
                     $currentPage = $prevPage;
                     $prevPage = base.getNewPage();
                     base.attachPage($currentPage);
+                } else {
+                    $prevPage.remove();
+                    $currentPage.remove();
+                    $nextPage.remove();
+
+                    $prevPage = base.getNewPage();
+                    $currentPage = base.getNewPage();
+                    $nextPage = base.getNewPage();
                 }
             }
 
@@ -690,12 +701,7 @@
                 base.$el.trigger("depage.magaziner.show", [urlsByPages[n], $currentPage]);
 
                 $currentPage.one(transitionEndEvent, function() {
-                    if (base.options.preloadPageTimeout < 0) return;
-
-                    preloadPageTimer = setTimeout(function() {
-                        base.preloadPageByNumber(base.currentPage - 1);
-                        base.preloadPageByNumber(base.currentPage + 1);
-                    }, base.options.preloadPageTimeout);
+                    base.schedulePagePreload();
                 });
             }
             $currentPage.one(transitionEndEvent, function() {
