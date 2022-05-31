@@ -7,7 +7,7 @@
  * adds a magazine like navigation to a website
  *
  *
- * copyright (c) 2013-2021 Frank Hellenkamp [jonas@depage.net]
+ * copyright (c) 2013-2020 Frank Hellenkamp [jonas@depage.net]
  *
  * @author    Frank Hellenkamp [jonas@depage.net]
  **/
@@ -155,9 +155,8 @@
         // global hammer options to drag only in one direction
         delete Hammer.defaults.cssProps.userSelect;
         var hammerOptions = {
-            threshold: 100,
-            //touchAction: "pan-y",
-            domEvents: false,
+            threshold: 30,
+            touchAction: "pan-y",
             direction: Hammer.DIRECTION_HORIZONTAL
         };
         if (pageWidth > 1000) {
@@ -233,9 +232,6 @@
 
             base.registerEvents();
             $body.ajaxify();
-
-            var beforeHtml = "";
-            var afterHtml = "";
 
             $currentPage
                 .data("loaded", true)
@@ -379,7 +375,7 @@
             });
             // }}}
             // {{{ statechangecomplete event
-            base.$el.on("depage.magaziner.statechangecomplete", function(url, $page) {
+            base.$el.on("depage.magaziner.statechangecomplete", function(e, url, $page) {
                 var
                     title = $currentPage.data("title"),
                     $meta = $currentPage.data("meta");
@@ -408,23 +404,34 @@
 
                 base.initPageLinks();
 
+                // Inform matomo of the change
+                if ( typeof window._paq !== 'undefined' ) {
+                    window._paq.push(['deleteCustomDimension', 1]);
+                    window._paq.push(['setCustomUrl', url]);
+                    window._paq.push(['setDocumentTitle', title]);
+                    window._paq.push(['trackPageView']);
+                }
+
                 // Inform Google Analytics of the change
                 if ( typeof window._gaq !== 'undefined' ) {
                     window._gaq.push(['_trackPageview', url]);
                 } else if ( typeof window.ga !== 'undefined' ) {
                     window.ga('send', 'pageview');
-                } else if ( typeof window.gtag !== 'undefined' ) {
-                    window.gtag('config', 'GA_MEASUREMENT_ID');
-                }
-
-                // Inform matomo of the change
-                if ( typeof window._paq !== 'undefined' ) {
-                    window._paq.push(['trackPageView', url]);
                 }
 
                 // Inform pinterest of the change
                 if ( typeof window.pintrk !== 'undefined' ) {
                     window.pintrk('track', 'pagevisit');
+                }
+
+                // inform google tag manager
+                if ( typeof window.dataLayer !== 'undefined' ) {
+                    window.dataLayer.push({
+                        'event': 'Pageview',
+                        'pagePath': url,
+                        'pageTitle': title,
+                        'visitorType': 'visitor'
+                    });
                 }
             });
             // }}}
@@ -603,6 +610,13 @@
             base.$el.trigger("depage.magaziner.detached", [$page]);
         };
         // }}}
+        // {{{ removePage
+        base.removePage = function($page) {
+            base.$el.trigger("depage.magaziner.removed", [$page]);
+
+            $page.remove();
+        };
+        // }}}
         // {{{ offsetPages
         base.offsetPages = function(x, adjustYOffset) {
             base.attachPage($currentPage);
@@ -646,26 +660,26 @@
             var posDiff = n - base.currentPage;
 
             if (isNewPage) {
-                if (posDiff == 1) {
-                    $prevPage.remove();
+                if (posDiff > 1 || posDiff < -1) {
+                    base.removePage($prevPage);
+                    base.removePage($currentPage);
+                    base.removePage($nextPage);
+
+                    $prevPage = base.getNewPage();
+                    $currentPage = base.getNewPage();
+                    $nextPage = base.getNewPage();
+                } else if (posDiff == 1) {
+                    base.removePage($prevPage);
                     $prevPage = $currentPage;
                     $currentPage = $nextPage;
                     $nextPage = base.getNewPage();
                     base.attachPage($currentPage);
                 } else if (posDiff == -1) {
-                    $nextPage.remove();
+                    base.removePage($nextPage);
                     $nextPage = $currentPage;
                     $currentPage = $prevPage;
                     $prevPage = base.getNewPage();
                     base.attachPage($currentPage);
-                } else {
-                    $prevPage.remove();
-                    $currentPage.remove();
-                    $nextPage.remove();
-
-                    $prevPage = base.getNewPage();
-                    $currentPage = base.getNewPage();
-                    $nextPage = base.getNewPage();
                 }
             }
 
