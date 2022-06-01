@@ -1,5 +1,5 @@
 /**
- * @require framework/shared/jquery-1.8.3.js
+ * @require framework/shared/jquery-1.12.3.min.js
  * @require framework/shared/depage-jquery-plugins/depage-markerbox.js
  *
  * @file    depage-tool-tip
@@ -30,6 +30,8 @@
         base.$el = $(el);
         base.el = el;
 
+        var showTimeout = null;
+
         // Add a reverse reference to the DOM object
         base.$el.data("depage.tooltip", base);
 
@@ -56,15 +58,32 @@
          */
         base.tip = function(){
             base.$el
+                .bind('click.tooltip', function(e) {
+                    clearTimeout(showTimeout);
+                    base.hide();
+                })
                 .bind('mouseenter.tooltip', function(e) {
-                    base.show(e.pageX, e.PageY);
+                    clearTimeout(showTimeout);
+
+                    showTimeout = setTimeout(function() {
+                        base.show();
+                    }, base.options.fadeinTimeout);
+
+                    base.$el.attr("data-temp-title", base.$el.attr("title"));
+                    base.$el.removeAttr("title");
+
                     return false;
                 })
                 .bind('mouseleave.tooltip', function(e) {
+                    clearTimeout(showTimeout);
+
                     var hideIfOut = function(e) {
                         // FF does not have toElement, and only relatedTarget on mouseleave - e.target is for mousemove
                         if ($(e.toElement || e.relatedTarget || e.target).parents('#depage-tooltip').length === 0) {
                             base.hide();
+
+                            base.$el.attr("title", base.$el.attr("data-temp-title"));
+
                             return true;
                         }
                         return false;
@@ -106,7 +125,9 @@
         message: '',
         direction : 'TL',
         directionMarker : null,
-        fadeoutDuration: 300
+        fadeinTimeout: 500,
+        fadeinDuration: 200,
+        fadeoutDuration: 200
     };
 
     $.fn.depageTooltip = function(options){

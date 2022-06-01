@@ -156,11 +156,8 @@
         delete Hammer.defaults.cssProps.userSelect;
         var hammerOptions = {
             threshold: 30,
-            //touchAction: "none",
-            //touchAction: "pan-y pan-x",
             touchAction: "pan-y",
             direction: Hammer.DIRECTION_HORIZONTAL
-            //direction: Hammer.DIRECTION_ALL
         };
         if (pageWidth > 1000) {
             hammerOptions.threshold *= 2;
@@ -236,9 +233,6 @@
             base.registerEvents();
             $body.ajaxify();
 
-            var beforeHtml = "";
-            var afterHtml = "";
-
             $currentPage
                 .data("loaded", true)
                 .data("loading", false)
@@ -253,12 +247,7 @@
 
             base.show(base.currentPage);
 
-            if (base.options.preloadPageTimeout < 0) return;
-
-            preloadPageTimer = setTimeout(function() {
-                base.preloadPageByNumber(base.currentPage - 1);
-                base.preloadPageByNumber(base.currentPage + 1);
-            }, base.options.preloadPageTimeout);
+            base.schedulePagePreload();
         };
         // }}}
         // {{{ initPageLinks
@@ -386,7 +375,7 @@
             });
             // }}}
             // {{{ statechangecomplete event
-            base.$el.on("depage.magaziner.statechangecomplete", function(url, $page) {
+            base.$el.on("depage.magaziner.statechangecomplete", function(e, url, $page) {
                 var
                     title = $currentPage.data("title"),
                     $meta = $currentPage.data("meta");
@@ -415,18 +404,34 @@
 
                 base.initPageLinks();
 
+                // Inform matomo of the change
+                if ( typeof window._paq !== 'undefined' ) {
+                    window._paq.push(['deleteCustomDimension', 1]);
+                    window._paq.push(['setCustomUrl', url]);
+                    window._paq.push(['setDocumentTitle', title]);
+                    window._paq.push(['trackPageView']);
+                }
+
                 // Inform Google Analytics of the change
                 if ( typeof window._gaq !== 'undefined' ) {
                     window._gaq.push(['_trackPageview', url]);
                 } else if ( typeof window.ga !== 'undefined' ) {
                     window.ga('send', 'pageview');
-                } else if ( typeof window.gtag !== 'undefined' ) {
-                    window.gtag('config', 'GA_MEASUREMENT_ID');
                 }
 
-                // Inform matomo of the change
-                if ( typeof window._paq !== 'undefined' ) {
-                    window._paq.push(['trackPageView', url]);
+                // Inform pinterest of the change
+                if ( typeof window.pintrk !== 'undefined' ) {
+                    window.pintrk('track', 'pagevisit');
+                }
+
+                // inform google tag manager
+                if ( typeof window.dataLayer !== 'undefined' ) {
+                    window.dataLayer.push({
+                        'event': 'Pageview',
+                        'pagePath': url,
+                        'pageTitle': title,
+                        'visitorType': 'visitor'
+                    });
                 }
             });
             // }}}
@@ -453,6 +458,19 @@
             }
 
             return $page;
+        };
+        // }}}
+        // {{{ schedulePagePreload()
+        base.schedulePagePreload = function(n) {
+            if (base.options.preloadPageTimeout < 0) return;
+
+            preloadPageTimer = setTimeout(function() {
+                base.preloadPageByNumber(base.currentPage + 1);
+
+                preloadPageTimer = setTimeout(function() {
+                    base.preloadPageByNumber(base.currentPage - 1);
+                }, base.options.preloadPageTimeout);
+            }, base.options.preloadPageTimeout);
         };
         // }}}
         // {{{ preloadPageByNumber()
@@ -592,6 +610,13 @@
             base.$el.trigger("depage.magaziner.detached", [$page]);
         };
         // }}}
+        // {{{ removePage
+        base.removePage = function($page) {
+            base.$el.trigger("depage.magaziner.removed", [$page]);
+
+            $page.remove();
+        };
+        // }}}
         // {{{ offsetPages
         base.offsetPages = function(x, adjustYOffset) {
             base.attachPage($currentPage);
@@ -636,21 +661,21 @@
 
             if (isNewPage) {
                 if (posDiff > 1 || posDiff < -1) {
-                    $prevPage.remove();
-                    $currentPage.remove();
-                    $nextPage.remove();
+                    base.removePage($prevPage);
+                    base.removePage($currentPage);
+                    base.removePage($nextPage);
 
                     $prevPage = base.getNewPage();
                     $currentPage = base.getNewPage();
                     $nextPage = base.getNewPage();
                 } else if (posDiff == 1) {
-                    $prevPage.remove();
+                    base.removePage($prevPage);
                     $prevPage = $currentPage;
                     $currentPage = $nextPage;
                     $nextPage = base.getNewPage();
                     base.attachPage($currentPage);
                 } else if (posDiff == -1) {
-                    $nextPage.remove();
+                    base.removePage($nextPage);
                     $nextPage = $currentPage;
                     $currentPage = $prevPage;
                     $prevPage = base.getNewPage();
@@ -690,12 +715,7 @@
                 base.$el.trigger("depage.magaziner.show", [urlsByPages[n], $currentPage]);
 
                 $currentPage.one(transitionEndEvent, function() {
-                    if (base.options.preloadPageTimeout < 0) return;
-
-                    preloadPageTimer = setTimeout(function() {
-                        base.preloadPageByNumber(base.currentPage - 1);
-                        base.preloadPageByNumber(base.currentPage + 1);
-                    }, base.options.preloadPageTimeout);
+                    base.schedulePagePreload();
                 });
             }
             $currentPage.one(transitionEndEvent, function() {
@@ -734,10 +754,9 @@
         // {{{ load
         base.load = function(url) {
             // loading page not in page list
-
-            $prevPage.remove();
-            $currentPage.remove();
-            $nextPage.remove();
+            base.removePage($prevPage);
+            base.removePage($currentPage);
+            base.removePage($nextPage);
 
             $prevPage = base.getNewPage();
             $currentPage = base.getNewPage().addClass("current-page");

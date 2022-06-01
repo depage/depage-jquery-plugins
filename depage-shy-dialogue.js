@@ -107,7 +107,7 @@
                 });
 
                 // stop propagation of hide when clicking inside the wrapper or input
-                base.$wrapper.click(function(e) {
+                base.$wrapper.on("click.shydialogue", function(e) {
                     e.stopPropagation();
                 });
 
@@ -117,11 +117,19 @@
                     });
                 }
 
-                // hide dialog when clicked outside
-                $(document).on("click.shydialogue", function() {
-                    base.hideDialogue();
-                });
+                var ignoreClickEvent = false;
 
+                // hide dialog when clicked outside
+				base.$wrapper.on("mouseup.shydialogue touchend.shydialogue", function() {
+                    ignoreClickEvent = true;
+                });
+                $(document).on("click.shydialogue", function() {
+                    if (!ignoreClickEvent) {
+                        base.hideDialogue();
+                    }
+                    ignoreClickEvent = false;
+                });
+                $(document).triggerHandler("show.shydialogue");
             }, 10);
         };
         /// }}}
@@ -131,6 +139,7 @@
 
             $(document).off("click.shydialogue").off('keyup.shydialogue');
 
+            $(document).triggerHandler("hide.shydialogue");
         };
         // }}}
 

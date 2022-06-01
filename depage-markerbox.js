@@ -62,7 +62,7 @@
                 setTimeout(function() {
                     // defer setting position until element has added all children
                     that.setPosition(top, left, base.options.direction);
-                    that.$wrapper.fadeIn(base.options.fadeinDuration);
+                    that.$wrapper.addClass("visible");
                 }, 10);
 
                 // allow chaining
@@ -84,7 +84,7 @@
 
                 if (!this.$wrapper) return this;
 
-                this.$wrapper.fadeOut(duration, callback);
+                this.$wrapper.removeClass("visible");
 
                 // allow chaining
                 return this;
@@ -124,7 +124,7 @@
 
                 this.$dialogue = $('<div />');
 
-                this.$wrapper = $('<div class="wrapper" />').hide();
+                this.$wrapper = $('<div class="wrapper" />');
                 this.$dialogue.append(this.$wrapper);
 
                 if (base.options.directionMarker) {
@@ -313,8 +313,18 @@
              * @return void
              */
             setContent : function(title, message, icon) {
+                if (typeof title == 'function') {
+                    title = title();
+                }
+                if (typeof message == 'function') {
+                    message = message();
+                }
                 var $title = $('<h1 />').text(title);
-                var $message = $('<p />').text(message);
+                if (Object.getPrototypeOf(message).jquery) {
+                    var $message = message.clone();
+                } else {
+                    var $message = $('<p />').text(message);
+                }
 
                 this.$contentWrapper.empty()
                     .append($title)
