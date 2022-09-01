@@ -238,7 +238,8 @@
                 .data("loading", false)
                 .data("classes", $body.attr("class"))
                 .data("title", document.title)
-                .data("meta", $head.find("meta[name], meta[property]"));
+                .data("meta", $head.find("meta[name], meta[property]"))
+                .data("link", $head.find("link[rel='canonical'], link[rel='alternate'], link[rel='icon']"));
 
             $prevPage = base.getNewPage();
             $nextPage = base.getNewPage();
@@ -378,7 +379,8 @@
             base.$el.on("depage.magaziner.statechangecomplete", function(e, url, $page) {
                 var
                     title = $currentPage.data("title"),
-                    $meta = $currentPage.data("meta");
+                    $meta = $currentPage.data("meta"),
+                    $link = $currentPage.data("link");
 
                 if (title) {
                     // Update the title
@@ -397,6 +399,17 @@
                             $m.attr(attrib.name, attrib.value);
                         });
                         $head.append($m);
+                    });
+                }
+                if ($link) {
+                    $head.find("link[rel='canonical'], link[rel='alternate'], link[rel='icon']").remove();
+                    $link.each(function() {
+                        var $l = $("<link />");
+                        $.each(this.attributes, function(i, attrib){
+                            if (attrib.name == 'class') return;
+                            $l.attr(attrib.name, attrib.value);
+                        });
+                        $head.append($l);
                     });
                 }
 
@@ -565,7 +578,8 @@
                         .data("loaded", true)
                         .data("classes", $dataBody.attr("class"))
                         .data("title", $data.find('.document-title:first').text())
-                        .data("meta", $data.find(".document-meta[name], .document-meta[property]"));
+                        .data("meta", $data.find(".document-meta[name], .document-meta[property]"))
+                        .data("link", $data.find("link[rel='canonical'], link[rel='alternate'], link[rel='icon']"));
 
                     base.$el.trigger("depage.magaziner.loaded", [url, $page]);
                     base.$el.trigger("depage.magaziner.show", [url, $page]);
