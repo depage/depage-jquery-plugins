@@ -239,6 +239,7 @@
                 .data("classes", $body.attr("class"))
                 .data("title", document.title)
                 .data("meta", $head.find("meta[name], meta[property]"))
+                .data("ldjson", $head.find("script[type='application/ld+json']"))
                 .data("link", $head.find("link[rel='canonical'], link[rel='alternate'], link[rel='icon']"));
 
             $prevPage = base.getNewPage();
@@ -380,6 +381,7 @@
                 var
                     title = $currentPage.data("title"),
                     $meta = $currentPage.data("meta"),
+                    $ldjson = $currentPage.data("ldjson"),
                     $link = $currentPage.data("link");
 
                 if (title) {
@@ -399,6 +401,14 @@
                             $m.attr(attrib.name, attrib.value);
                         });
                         $head.append($m);
+                    });
+                }
+                if ($ldjson) {
+                    $head.find("script[type='application/ld+json']").remove();
+                    $ldjson.each(function() {
+                        var $l = $("<script type=\"application/ld+json\" />");
+                        $l.text($ldjson.text());
+                        $head.append($l);
                     });
                 }
                 if ($link) {
@@ -537,12 +547,6 @@
                         contentHtml,
                         $scripts;
 
-                    // Fetch the scripts
-                    $scripts = $dataContent.find('.document-script');
-                    if ( $scripts.length ) {
-                        $scripts.detach();
-                    }
-
                     $data.find("a[href]:internal").each( function() {
                         var $el = $(this);
                         $el.attr("href", makeAbsolute(url, $el.attr("href")));
@@ -562,13 +566,6 @@
                     // Update the content
                     $page.html(contentHtml).ajaxify();
 
-                    // Add the scripts
-                    $scripts.each(function(){
-                        var $script = $(this), scriptText = $script.text(), scriptNode = document.createElement('script');
-                        scriptNode.appendChild(document.createTextNode(scriptText));
-                        //contentNode.appendChild(scriptNode);
-                    });
-
                     $dataBody
                         .removeClass('document-body');
 
@@ -579,6 +576,7 @@
                         .data("classes", $dataBody.attr("class"))
                         .data("title", $data.find('.document-title:first').text())
                         .data("meta", $data.find(".document-meta[name], .document-meta[property]"))
+                        .data("ldjson", $data.find(".document-script[type='application/ld+json']"))
                         .data("link", $data.find("link[rel='canonical'], link[rel='alternate'], link[rel='icon']"));
 
                     base.$el.trigger("depage.magaziner.loaded", [url, $page]);
