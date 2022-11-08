@@ -285,10 +285,11 @@
         base.registerEvents = function() {
             // {{{ horizontal scrolling between pages
             base.$el.hammer(hammerOptions).on("panleft panright swipeleft swiperight", function(e) {
-                if (e.gesture.pointerType == "mouse" || e.gesture.srcEvent.type == 'pointercancel') {
-                    return;
-                }
-                if (urlsByPages.length == 1) {
+                if (typeof e.gesture == 'undefined' ||
+                    e.gesture.pointerType == "mouse" ||
+                    e.gesture.srcEvent.type == 'pointercancel' ||
+                    urlsByPages.length <= 1
+                ) {
                     return;
                 }
 
@@ -301,10 +302,10 @@
             // }}}
             // {{{ dragend actions after horizontal or vertical scrolling
             base.$el.hammer(hammerOptions).on("panend pancancel", function(e) {
-                if (e.gesture.pointerType == "mouse") {
-                    return;
-                }
-                if (urlsByPages.length == 1) {
+                if (typeof e.gesture == 'undefined' ||
+                    e.gesture.pointerType == "mouse" ||
+                    urlsByPages <= 1
+                ) {
                     return;
                 }
                 if (Math.abs(e.gesture.deltaY) > hammerOptions.threshold) {
